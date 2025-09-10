@@ -1,0 +1,26 @@
+{
+  "name": "simplifyed-trading-frontend",
+  "version": "1.0.0",
+  "description": "Simplifyed Trading Dashboard Frontend",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "serve": "python3 -m http.server 8080",
+    "dev": "python3 -m http.server 8080",
+    "build": "echo 'No build process needed for static frontend'",
+    "test": "echo 'No tests specified yet'",
+    "lint": "echo 'No linting configured yet'",
+    "setup": "echo 'Frontend setup complete - no dependencies to install'"
+  },
+  "keywords": [
+    "trading",
+    "dashboard",
+    "openalgo",
+    "frontend",
+    "static"
+  ],
+  "author": "Simplifyed Trading",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}

@@ -1,0 +1,236 @@
+Simplifyed System Architecture — Diagram & Specs
+
+System Overview
+
+The Simplifyed Admin Dashboard connects to multiple OpenAlgo instances using their respective API keys. It monitors fund balances, comprehensive P&L tracking (realized + unrealized), and system health while providing centralized control over live/analyzer modes, auto-closing positions, and enforcing daily profit/loss limits with enhanced filtering and cumulative P&L display.
+
+Architecture Diagram
+
+graph TD
+    A[Admin Dashboard UI] --> B[Backend Server]
+    B -->|POST APIs with apikey| C1[OpenAlgo Instance 1]
+    B -->|POST APIs with apikey| C2[OpenAlgo Instance 2]
+    B -->|POST APIs with apikey| C3[OpenAlgo Instance N]
+
+    B --> D[Database]
+    B --> E[Scheduler & Workers]
+    E -->|20s Polling| C1
+    E -->|20s Polling| C2
+    E -->|20s Polling| C3
+    E -->|20min Health Check| C1
+    E -->|20min Health Check| C2
+    E -->|20min Health Check| C3
+
+Core Modules
+	•	UI Layer: Dashboard with table/card toggle, search, filters, bulk actions, enhanced P&L display with realized/unrealized breakdown, cumulative P&L for filtered instances.
+	•	Backend Layer: Orchestration, monitoring logic, safe-switch workflow, comprehensive P&L calculation engine.
+	•	Scheduler & Workers: Periodic tasks for comprehensive P&L fetch (tradebook + positionbook), balance fetch, health check on the server side.
+	•	Database: Store OpenAlgo instance configs, monitoring settings, comprehensive P&L data (realized, unrealized, total), daily logs.
+
+Key API Workflows (Examples)
+
+All OpenAlgo REST API calls use POST, with the apikey in the JSON body.
+
+1. Fetch Fund Balance
+
+Endpoint: POST https://<instance-host>/api/v1/funds/balance
+
+// Request
+{
+  "apikey": "<instance-api-key>"
+}
+
+// Response
+{
+  "status": "success",
+  "data": {
+    "balance": 125000.50,
+    "currency": "INR",
+    "margin_used": 20000.00
+  }
+}
+
+2. Fetch Comprehensive P&L (Realized + Unrealized)
+
+Tradebook Endpoint: POST https://<instance-host>/api/v1/tradebook
+Positionbook Endpoint: POST https://<instance-host>/api/v1/positionbook
+
+// Request (both endpoints)
+{
+  "apikey": "<instance-api-key>"
+}
+
+// Tradebook Response (for realized P&L calculation)
+{
+  "status": "success", 
+  "data": [
+    {
+      "symbol": "NIFTY24DECFUT",
+      "action": "BUY",
+      "price": "24500.00",
+      "quantity": "50"
+    },
+    {
+      "symbol": "NIFTY24DECFUT", 
+      "action": "SELL",
+      "price": "24550.00",
+      "quantity": "50"
+    }
+  ]
+}
+
+// Positionbook Response (for unrealized P&L calculation)
+{
+  "status": "success",
+  "data": [
+    {
+      "symbol": "BANKNIFTY24DECFUT",
+      "netqty": "25", 
+      "avg_price": "51200.00",
+      "ltp": "51350.00",
+      "pnl": "3750.00"
+    }
+  ]
+}
+
+// Final P&L Calculation Result
+{
+  "realized_pnl": 2500.00,     // From completed trades (tradebook)
+  "unrealized_pnl": 3750.00,   // From open positions (positionbook)  
+  "total_pnl": 6250.00         // Sum of realized + unrealized
+}
+
+3. Close All Open Positions
+
+Endpoint: POST https://<instance-host>/api/v1/closeposition
+
+// Request
+{
+  "apikey": "<instance-api-key>",
+  "strategy_tag": "NIFTY_SCALPER"
+}
+
+// Response
+{
+  "status": "success",
+  "message": "All Open Positions Squared Off"
+}
+
+4. Cancel All Pending Orders
+
+Endpoint: POST https://<instance-host>/api/v1/cancelallorder
+
+// Request
+{
+  "apikey": "<instance-api-key>",
+  "strategy_tag": "NIFTY_SCALPER"
+}
+
+// Response
+{
+    "canceled_orders": [
+        "0721fa1fd9a0AO",
+        "072189b980bdAO",
+        "0721594cd608AO",
+        "0721814b604aAO",
+        "0721311ab759AO",
+        "07217e80d074AO",
+        "0721db153fe3AO",
+        "0721c7baab38AO",
+        "0721c5ab99b0AO",
+        "072164d8099bAO"
+    ],
+    "failed_cancellations": [
+        "072153dcf551AO",
+        "0721f2c87f5aAO"
+    ],
+    "message": "Canceled 12 orders. Failed to cancel 2 orders.",
+    "status": "success"
+}
+
+5. Toggle Analyzer Mode
+
+Endpoint: POST https://<instance-host>/api/v1/analyzer/toggle
+
+// Request
+{
+  "apikey": "<instance-api-key>",
+  "mode": true   // true = enable analyzer, false = disable analyzer (live)
+}
+
+// Response
+{
+  "status": "success",
+  "data": {
+    "analyze_mode": true,
+    "message": "Analyzer mode switched to analyze",
+    "mode": "analyze",
+    "total_logs": 0
+  }
+}
+
+6. Check Analyzer Mode
+
+Endpoint: POST https://<instance-host>/api/v1/analyzer
+
+// Request
+{
+  "apikey": "<instance-api-key>",
+}
+
+// Response
+{
+  "status": "success",
+  "data": {
+    "analyze_mode": true,
+    "mode": "analyze",
+    "total_logs": 0
+  }
+}
+
+6. Health Check Ping
+
+Endpoint: POST https://<instance-host>/api/v1/ping
+
+// Request
+{
+  "apikey": "<instance-api-key>",
+}
+
+// Response
+{
+  "status": "success",
+  "data": {
+    "broker": "upstox",
+    "message": "pong"
+  }
+}
+
+Safe-Switch Workflow (Live → Analyzer)
+	1.	Call /closepositions/ with strategy tag.
+	2.	Call /cancelallorder/ with strategy tag.
+	3.	Confirm no open or pending orders in /positionbook/.
+	4.	Call /analyzer/toggle/ with mode: true.
+	5.	Check /analyzer/ is in mode: analyze.
+
+Monitoring Cadence
+	•	Every 30s → Fetch fund balance, comprehensive P&L (tradebook + positionbook), check targets using total P&L on the server side.
+	•	Every 20min → Health check by pinging instance using /ping/ on the server side.
+
+Failure Handling
+	•	Retry up to 3 times on network error.
+	•	Log failed API calls with timestamp.
+	•	Alert admin via dashboard if unreachable > 2 retries.
+
+Security
+	•	Encrypt API keys at rest in DB.
+	•	TLS for all API traffic.
+	•	RBAC for admin/operator roles.
+
+Implementation Checklist (Phased) - ✅ COMPLETED
+	1.	✅ Phase 1: Admin onboarding page, DB storage, basic instance list.
+	2.	✅ Phase 2: Comprehensive P&L & fund balance polling, UI cards/table with P&L breakdown, analyzer toggle.
+	3.	✅ Phase 3: Safe-switch workflow with auto-close + cancel using total P&L targets.
+	4.	✅ Phase 4: Multi-instance bulk control, search, filters, and cumulative P&L for filtered instances.
+	5.	✅ Phase 5: Alerts, health monitoring, and automated P&L guardrails using comprehensive P&L.
+	6.	✅ Phase 6: Security hardening, audit logs, and RBAC with Google OAuth.

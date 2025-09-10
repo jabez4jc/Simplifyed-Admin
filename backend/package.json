@@ -1,0 +1,41 @@
+{
+  "name": "simplifyed-trading-backend",
+  "version": "1.0.0",
+  "description": "Simplifyed Trading Dashboard Backend API",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build": "echo 'No build process needed for backend'",
+    "test": "echo 'No tests specified yet'",
+    "lint": "echo 'No linting configured yet'",
+    "setup": "npm install && echo 'Backend setup complete'",
+    "db:check": "sqlite3 database/simplifyed.db '.tables'",
+    "db:schema": "sqlite3 database/simplifyed.db '.schema'",
+    "pm2:start": "pm2 start ecosystem.config.js --env production",
+    "pm2:start:dev": "pm2 start ecosystem.config.js --env development",
+    "pm2:stop": "pm2 stop simplifyed-trading",
+    "pm2:restart": "pm2 restart simplifyed-trading",
+    "pm2:delete": "pm2 delete simplifyed-trading",
+    "pm2:logs": "pm2 logs simplifyed-trading",
+    "pm2:status": "pm2 status"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.3.1",
+    "sqlite3": "^5.1.6",
+    "node-cron": "^3.0.3",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "express-session": "^1.17.3",
+    "connect-sqlite3": "^0.9.13"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
