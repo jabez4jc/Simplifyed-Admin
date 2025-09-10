@@ -145,6 +145,8 @@ SimplifyedAdmin/
 │   └── 📚 openalgo-api-docs.md
 ├── 📄 CLAUDE.md                  # Complete technical documentation
 ├── 🗄️ DATABASE_SCHEMA.md         # Database schema documentation
+├── 🚀 DEPLOYMENT.md              # Production deployment guide
+├── ⚙️ install-ubuntu.sh          # Automated Ubuntu installation script
 ├── 🙈 .gitignore                 # Security-focused git ignore
 └── 📖 README.md                  # This file
 ```
@@ -280,7 +282,37 @@ if (totalPnL <= -targetLoss && !isAnalyzerMode) {
 
 ## 🚀 Production Deployment
 
-### Using PM2 (Recommended)
+### 🖥️ Automated Ubuntu Server Installation (Recommended)
+
+The easiest way to deploy Simplifyed Admin Dashboard on Ubuntu Server with custom domain and SSL certificate:
+
+```bash
+# Download and run the installation script
+wget https://raw.githubusercontent.com/jabez4jc/Simplifyed-Admin/main/install-ubuntu.sh
+chmod +x install-ubuntu.sh
+sudo ./install-ubuntu.sh your-domain.com admin@yourdomain.com
+```
+
+**What the script does:**
+- ✅ Installs Node.js 18, PM2, Nginx, and all dependencies
+- ✅ Creates dedicated user account (`simplifyed`)
+- ✅ Configures Nginx reverse proxy with security headers
+- ✅ Sets up SSL certificate with Let's Encrypt
+- ✅ Configures UFW firewall with proper rules
+- ✅ Starts services and enables auto-startup
+- ✅ Creates Google OAuth setup instructions
+
+**Requirements:**
+- Ubuntu Server 20.04+ with root access
+- Domain name pointing to your server IP
+- Ports 80 and 443 open
+
+**Post-Installation:**
+1. Set up Google OAuth credentials (instructions provided)
+2. Access dashboard at `https://your-domain.com`
+3. First login becomes admin automatically
+
+### Using PM2 (Manual Setup)
 ```bash
 # Install PM2 globally
 npm install -g pm2
@@ -457,6 +489,7 @@ DEBUG=simplifyed:* npm start
 
 - **[CLAUDE.md](CLAUDE.md)**: Complete technical documentation
 - **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)**: Database schema and migrations
+- **[DEPLOYMENT.md](DEPLOYMENT.md)**: Production deployment guide with Ubuntu installer
 - **[Requirements/](Requirements/)**: System architecture and API documentation
 - **[OpenAlgo API Docs](Requirements/openalgo-api-docs.md)**: OpenAlgo integration guide
 

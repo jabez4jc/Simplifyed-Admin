@@ -279,12 +279,53 @@ python3 -m http.server 8080
 ```
 
 ### Production Deployment
+
+#### Automated Ubuntu Server Installation (Recommended)
+
+The fastest way to deploy on Ubuntu Server with custom domain and SSL:
+
+```bash
+# Download and run the installation script
+wget https://raw.githubusercontent.com/jabez4jc/Simplifyed-Admin/main/install-ubuntu.sh
+chmod +x install-ubuntu.sh
+sudo ./install-ubuntu.sh your-domain.com admin@yourdomain.com
+```
+
+**What the script configures:**
+- Node.js 18 + PM2 process manager
+- Nginx reverse proxy with security headers
+- SSL certificate via Let's Encrypt
+- UFW firewall configuration
+- Dedicated `simplifyed` user account
+- Auto-startup on system reboot
+
+**File Locations:**
+- Application: `/opt/simplifyed-admin`
+- Nginx config: `/etc/nginx/sites-available/simplifyed-admin`
+- Environment: `/opt/simplifyed-admin/backend/.env`
+- OAuth setup: `/opt/simplifyed-admin/GOOGLE_OAUTH_SETUP.md`
+
+#### Manual PM2 Deployment
+
 ```bash
 # Backend (PM2 recommended)
 pm2 start server.js --name "simplifyed-backend"
 
 # Frontend (Nginx recommended)
 # Configure Nginx to serve static files and proxy API calls
+```
+
+#### Docker Deployment
+
+```dockerfile
+# Example Dockerfile structure
+FROM node:18-alpine
+WORKDIR /app
+COPY backend/ ./backend/
+COPY frontend/ ./frontend/
+RUN cd backend && npm ci --only=production
+EXPOSE 3000
+CMD ["npm", "start"]
 ```
 
 ## Monitoring & Maintenance
