@@ -6,8 +6,14 @@
 # 
 # This script automates the complete installation of Simplifyed Admin Dashboard
 # on Ubuntu Server 20.04+ with Nginx reverse proxy and SSL certificate setup.
+# 
+# Supports multiple applications on the same server with different domains.
 #
 # Features:
+# - Multi-app support with domain-specific directories (/opt/apps/domain.com)
+# - Automated port allocation (starts from 3000, auto-increments)
+# - Individual PM2 configurations for each app instance
+# - Domain-specific Nginx site configurations
 # - Automated dependency installation (Node.js, PM2, Nginx)
 # - Domain mapping with SSL certificate (Let's Encrypt)
 # - Firewall configuration
@@ -17,6 +23,11 @@
 # Usage:
 #   sudo chmod +x install-ubuntu.sh
 #   sudo ./install-ubuntu.sh your-domain.com your-email@example.com
+#
+# Multiple apps example:
+#   sudo ./install-ubuntu.sh admin.example.com admin@example.com
+#   sudo ./install-ubuntu.sh dashboard.example.com admin@example.com
+#   sudo ./install-ubuntu.sh trading.example.com admin@example.com
 #
 # =============================================================================
 
@@ -32,9 +43,12 @@ NC='\033[0m' # No Color
 # Configuration
 DOMAIN=""
 EMAIL=""
-APP_DIR="/opt/simplifyed-admin"
+APP_NAME=""
+APP_DIR=""
+APP_PORT=""
 APP_USER="simplifyed"
 NODE_VERSION="18"
+BASE_PORT=3000
 
 # =============================================================================
 # Helper Functions
@@ -77,6 +91,33 @@ validate_email() {
         log_error "Invalid email format: $email"
         exit 1
     fi
+}
+
+setup_app_config() {
+    log_info "Setting up application configuration..."
+    
+    # Create app name from domain (replace dots and hyphens with underscores)
+    APP_NAME=$(echo "$DOMAIN" | sed 's/[.-]/_/g')
+    
+    # Create domain-specific directory
+    APP_DIR="/opt/apps/$DOMAIN"
+    
+    log_info "Application name: $APP_NAME"
+    log_info "Application directory: $APP_DIR"
+    log_success "Application configuration set up"
+}
+
+find_available_port() {
+    log_info "Finding available port..."
+    
+    local port=$BASE_PORT
+    while netstat -tlnp 2>/dev/null | grep -q ":$port "; do
+        port=$((port + 1))
+    done
+    
+    APP_PORT=$port
+    log_info "Assigned port: $APP_PORT"
+    log_success "Available port found: $APP_PORT"
 }
 
 # =============================================================================
@@ -146,10 +187,29 @@ setup_application() {
     log_info "Creating production environment configuration..."
     cat > backend/.env << EOF
 NODE_ENV=production
-PORT=3000
+PORT=$APP_PORT
 BASE_URL=https://$DOMAIN
 FRONTEND_URL=https://$DOMAIN
 SESSION_SECRET=$(openssl rand -hex 32)
+EOF
+    
+    # Create PM2 ecosystem file for this specific instance
+    log_info "Creating PM2 ecosystem configuration..."
+    cat > ecosystem.config.js << EOF
+module.exports = {
+  apps: [{
+    name: '$APP_NAME',
+    script: 'backend/server.js',
+    cwd: '$APP_DIR',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    env: {
+      NODE_ENV: 'production',
+      PORT: $APP_PORT
+    }
+  }]
+};
 EOF
     
     # Install backend dependencies
@@ -167,11 +227,14 @@ EOF
 configure_nginx() {
     log_info "Configuring Nginx reverse proxy..."
     
-    # Remove default site
-    rm -f /etc/nginx/sites-enabled/default
+    # Remove default site (only on first installation)
+    if [ ! -f /etc/nginx/sites-available/default.backup ]; then
+        cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.backup 2>/dev/null || true
+        rm -f /etc/nginx/sites-enabled/default
+    fi
     
-    # Create Simplifyed Admin site configuration
-    cat > /etc/nginx/sites-available/simplifyed-admin << EOF
+    # Create domain-specific site configuration
+    cat > /etc/nginx/sites-available/$DOMAIN << EOF
 # Simplifyed Admin Dashboard - Nginx Configuration
 server {
     listen 80;
@@ -210,7 +273,7 @@ server {
     
     # Backend API proxy
     location /api/ {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:$APP_PORT;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -228,7 +291,7 @@ server {
     
     # Authentication routes
     location /auth/ {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:$APP_PORT;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -248,7 +311,7 @@ server {
 EOF
     
     # Enable site
-    ln -sf /etc/nginx/sites-available/simplifyed-admin /etc/nginx/sites-enabled/
+    ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/
     
     # Test nginx configuration
     nginx -t
@@ -308,7 +371,7 @@ setup_services() {
     systemctl start nginx
     
     # Setup PM2 for the app user
-    cd $APP_DIR/backend
+    cd $APP_DIR
     sudo -u $APP_USER PM2_HOME=/home/$APP_USER/.pm2 pm2 start ecosystem.config.js --env production
     sudo -u $APP_USER PM2_HOME=/home/$APP_USER/.pm2 pm2 save
     
@@ -405,6 +468,8 @@ main() {
     install_nodejs
     create_app_user
     install_pm2
+    setup_app_config
+    find_available_port
     setup_application
     configure_nginx
     setup_ssl
@@ -423,14 +488,16 @@ main() {
     echo
     echo "📁 Important Files:"
     echo "   • Application: $APP_DIR"
-    echo "   • Nginx config: /etc/nginx/sites-available/simplifyed-admin"
+    echo "   • Nginx config: /etc/nginx/sites-available/$DOMAIN"
     echo "   • Environment: $APP_DIR/backend/.env"
     echo "   • OAuth setup: $APP_DIR/GOOGLE_OAUTH_SETUP.md"
+    echo "   • PM2 config: $APP_DIR/ecosystem.config.js"
     echo
     echo "🔧 Management Commands:"
-    echo "   • View logs: sudo -u $APP_USER PM2_HOME=/home/$APP_USER/.pm2 pm2 logs"
-    echo "   • Restart app: sudo -u $APP_USER PM2_HOME=/home/$APP_USER/.pm2 pm2 restart simplifyed-trading"
+    echo "   • View logs: sudo -u $APP_USER PM2_HOME=/home/$APP_USER/.pm2 pm2 logs $APP_NAME"
+    echo "   • Restart app: sudo -u $APP_USER PM2_HOME=/home/$APP_USER/.pm2 pm2 restart $APP_NAME"
     echo "   • Check status: sudo -u $APP_USER PM2_HOME=/home/$APP_USER/.pm2 pm2 status"
+    echo "   • App running on port: $APP_PORT"
     echo
 }
 
