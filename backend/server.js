@@ -10,6 +10,7 @@ import { dirname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import dotenv from 'dotenv';
 import { configureAuth, setupAuthRoutes, requireAuth } from './auth.js';
+import { updateInstancesData as updater_updateInstancesData, performHealthChecks as updater_performHealthChecks } from './lib/instance-updater.js';
 
 dotenv.config();
 
@@ -185,7 +186,7 @@ app.post('/api/instances', requireAuth, async (req, res) => {
     
     // Immediately try to update the new instance data
     setTimeout(() => {
-      updateInstancesData();
+      updater_updateInstancesData(dbAsync, makeOpenAlgoRequest);
     }, 1000);
     
     res.status(201).json(newInstance);
@@ -470,8 +471,8 @@ app.get('/api/instances/:id/analyzer-status', requireAuth, async (req, res) => {
 // Manual refresh instance data endpoint
 app.post('/api/refresh-instances', requireAuth, async (req, res) => {
   try {
-    console.log('🔄 Manual refresh triggered by user');
-    await updateInstancesData();
+  console.log('🔄 Manual refresh triggered by user');
+  await updater_updateInstancesData(dbAsync, makeOpenAlgoRequest);
     
     // Return updated instances
     const instances = await dbAsync.all('SELECT * FROM instances ORDER BY created_at DESC');
@@ -593,290 +594,26 @@ async function makeOpenAlgoRequest(instance, endpoint, method = 'POST', data = {
   return response.json();
 }
 
-// Comprehensive P&L Calculation Functions (based on your Python logic)
+// P&L helper functions are implemented in `backend/lib/pnl.js` and imported above.
 
-// Calculate realized P&L from completed trades
-function calculateRealizedPnL(trades) {
-  const grouped = {};
+// `getAccountPnL` moved to `backend/lib/account-pnl.js` and imported above.
 
-  for (let trade of trades) {
-    const { symbol, action, price, quantity } = trade;
-    const parsedPrice = parseFloat(price);
-    const parsedQuantity = parseInt(quantity);
-    
-    if (!grouped[symbol]) {
-      grouped[symbol] = { buyQty: 0, buySum: 0, sellQty: 0, sellSum: 0 };
-    }
+// Use dependency-injected update functions from `lib/instance-updater.js`
 
-    if (action === "BUY") {
-      grouped[symbol].buyQty += parsedQuantity;
-      grouped[symbol].buySum += parsedPrice * parsedQuantity;
-    } else if (action === "SELL") {
-      grouped[symbol].sellQty += parsedQuantity;
-      grouped[symbol].sellSum += parsedPrice * parsedQuantity;
-    }
-  }
+// Health checks are implemented in `backend/lib/instance-updater.js` (performHealthChecks)
 
-  const realizedPnL = {};
-  for (let symbol in grouped) {
-    const g = grouped[symbol];
-    const avgBuy = g.buyQty ? g.buySum / g.buyQty : 0;
-    const avgSell = g.sellQty ? g.sellSum / g.sellQty : 0;
-    const closedQty = Math.min(g.buyQty, g.sellQty);
-
-    realizedPnL[symbol] = (avgSell - avgBuy) * closedQty;
-  }
-
-  return realizedPnL;
-}
-
-// Calculate unrealized P&L from open positions
-function calculateUnrealizedPnL(positions) {
-  const unrealizedPnL = {};
-  for (let position of positions) {
-    unrealizedPnL[position.symbol] = parseFloat(position.pnl || 0);
-  }
-  return unrealizedPnL;
-}
-
-// Get comprehensive account P&L for an instance
-async function getAccountPnL(instance) {
-  try {
-    // Get tradebook data for realized P&L
-    const tradesResp = await makeOpenAlgoRequest(instance, 'tradebook');
-    const trades = (tradesResp.status === 'success' && tradesResp.data && tradesResp.data.trades) 
-      ? tradesResp.data.trades : [];
-
-    // Get positionbook data for unrealized P&L  
-    const positionsResp = await makeOpenAlgoRequest(instance, 'positionbook');
-    const positions = (positionsResp.status === 'success' && positionsResp.data && positionsResp.data.positions) 
-      ? positionsResp.data.positions : [];
-
-    // Calculate P&L components
-    const realized = calculateRealizedPnL(trades);
-    const unrealized = calculateUnrealizedPnL(positions);
-
-    // Combine and consolidate
-    const symbols = new Set([...Object.keys(realized), ...Object.keys(unrealized)]);
-    const perSymbol = [];
-    let totalRealized = 0, totalUnrealized = 0;
-
-    for (let symbol of symbols) {
-      const r = realized[symbol] || 0;
-      const u = unrealized[symbol] || 0;
-      perSymbol.push({ 
-        symbol, 
-        realized_pnl: r, 
-        unrealized_pnl: u, 
-        total_pnl: r + u 
-      });
-      totalRealized += r;
-      totalUnrealized += u;
-    }
-
-    const accountTotals = {
-      realized_pnl: totalRealized,
-      unrealized_pnl: totalUnrealized,
-      total_pnl: totalRealized + totalUnrealized
-    };
-
-    return { perSymbol, accountTotals };
-  } catch (error) {
-    console.error(`❌ Error calculating P&L for instance ${instance.id}:`, error.message);
-    // Fallback to basic calculation if comprehensive fails
-    try {
-      const positionsResp = await makeOpenAlgoRequest(instance, 'positionbook');
-      const fallbackPnL = (positionsResp.status === 'success' && positionsResp.data && positionsResp.data.positions) 
-        ? positionsResp.data.positions.reduce((total, pos) => total + parseFloat(pos.pnl || 0), 0)
-        : 0;
-      
-      return {
-        perSymbol: [],
-        accountTotals: {
-          realized_pnl: 0,
-          unrealized_pnl: fallbackPnL,
-          total_pnl: fallbackPnL
-        }
-      };
-    } catch (fallbackError) {
-      console.error(`❌ Fallback P&L calculation failed for instance ${instance.id}:`, fallbackError.message);
-      return {
-        perSymbol: [],
-        accountTotals: {
-          realized_pnl: 0,
-          unrealized_pnl: 0,
-          total_pnl: 0
-        }
-      };
-    }
-  }
-}
-
-// Update instances data periodically (Every 30s: Fund balance, P&L, check targets)
-async function updateInstancesData() {
-  try {
-    const instances = await dbAsync.all('SELECT * FROM instances WHERE is_active = 1');
-    
-    for (const instance of instances) {
-      try {
-        // Get account info (fund balance)
-        const accountInfo = await makeOpenAlgoRequest(instance, 'funds');
-        
-        if (accountInfo.status === 'success') {
-          const balance = parseFloat(accountInfo.data?.availablecash || 0);
-          
-          // Get comprehensive P&L calculation (realized + unrealized)
-          const pnlData = await getAccountPnL(instance);
-          const { realized_pnl, unrealized_pnl, total_pnl } = pnlData.accountTotals;
-
-          // Check profit/loss targets and auto-switch to analyzer if needed
-          const targetProfit = parseFloat(instance.target_profit) || 5000;
-          const targetLoss = parseFloat(instance.target_loss) || 2000;
-          
-          if (total_pnl >= targetProfit && !instance.is_analyzer_mode) {
-            console.log(`🎯 Target profit reached for instance ${instance.id}: ₹${total_pnl} >= ₹${targetProfit}`);
-            console.log(`   📊 Breakdown: Realized ₹${realized_pnl}, Unrealized ₹${unrealized_pnl}`);
-            console.log(`🔄 Auto-switching instance ${instance.id} to analyzer mode...`);
-            await autoSwitchToAnalyzer(instance, 'Target profit reached');
-          } else if (total_pnl <= -Math.abs(targetLoss) && !instance.is_analyzer_mode) {
-            console.log(`🛑 Max loss reached for instance ${instance.id}: ₹${total_pnl} <= ₹${-Math.abs(targetLoss)}`);
-            console.log(`   📊 Breakdown: Realized ₹${realized_pnl}, Unrealized ₹${unrealized_pnl}`);
-            console.log(`🔄 Auto-switching instance ${instance.id} to analyzer mode...`);
-            await autoSwitchToAnalyzer(instance, 'Max loss reached');
-          }
-
-          // Update database with comprehensive P&L data
-          await dbAsync.run(
-            'UPDATE instances SET current_balance = ?, current_pnl = ?, realized_pnl = ?, unrealized_pnl = ?, total_pnl = ?, is_active = 1, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
-            [balance, total_pnl, realized_pnl, unrealized_pnl, total_pnl, instance.id]
-          );
-          
-          console.log(`✅ Updated instance ${instance.id}: Balance ₹${balance}, Total P&L ₹${total_pnl} (Realized: ₹${realized_pnl}, Unrealized: ₹${unrealized_pnl})`);
-        }
-      } catch (error) {
-        console.error(`❌ Error updating instance ${instance.id}:`, error.message);
-        
-        // Mark instance as inactive if connection failed
-        await dbAsync.run(
-          'UPDATE instances SET is_active = 0, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
-          [instance.id]
-        );
-      }
-    }
-  } catch (error) {
-    console.error('❌ Error in updateInstancesData:', error);
-  }
-}
-
-// Perform health checks (Every 20min: Ping instances)
-async function performHealthChecks() {
-  try {
-    console.log('🏥 Performing health checks on all instances...');
-    const instances = await dbAsync.all('SELECT * FROM instances');
-    
-    for (const instance of instances) {
-      try {
-        // Health check using ping endpoint
-        const pingResult = await makeOpenAlgoRequest(instance, 'ping');
-        
-        if (pingResult.status === 'success') {
-          // Instance is healthy - ensure it's marked as active
-          await dbAsync.run(
-            'UPDATE instances SET is_active = 1, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
-            [instance.id]
-          );
-          console.log(`💚 Health check passed for instance ${instance.id} (${pingResult.data?.broker || 'unknown'})`);
-        } else {
-          throw new Error('Health check failed - ping unsuccessful');
-        }
-      } catch (error) {
-        console.error(`💔 Health check failed for instance ${instance.id}:`, error.message);
-        
-        // Mark instance as inactive
-        await dbAsync.run(
-          'UPDATE instances SET is_active = 0, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
-          [instance.id]
-        );
-        
-        // TODO: Alert admin via dashboard if unreachable > 2 retries (future enhancement)
-      }
-    }
-  } catch (error) {
-    console.error('❌ Error in performHealthChecks:', error);
-  }
-}
-
-// Auto-switch instance to analyzer mode when targets are reached
-async function autoSwitchToAnalyzer(instance, reason) {
-  try {
-    console.log(`🔄 Starting Auto Safe-Switch for instance ${instance.id}: ${reason}`);
-    
-    // Step 1: Close all open positions
-    const closePayload = {};
-    if (instance.strategy_tag && instance.strategy_tag.trim() !== '') {
-      closePayload.strategy = instance.strategy_tag;
-    }
-    const closeResult = await makeOpenAlgoRequest(instance, 'closeposition', 'POST', closePayload);
-    console.log(`Auto-switch Step 1 result:`, closeResult);
-    
-    // Step 2: Cancel all pending orders
-    const cancelPayload = {};
-    if (instance.strategy_tag && instance.strategy_tag.trim() !== '') {
-      cancelPayload.strategy = instance.strategy_tag;
-    }
-    const cancelResult = await makeOpenAlgoRequest(instance, 'cancelallorder', 'POST', cancelPayload);
-    console.log(`Auto-switch Step 2 result:`, cancelResult);
-    
-    // Step 3: Confirm no open positions
-    const positionCheck = await makeOpenAlgoRequest(instance, 'positionbook');
-    if (positionCheck.status === 'success' && 
-        positionCheck.data && 
-        positionCheck.data.positions && 
-        positionCheck.data.positions.length > 0) {
-      const openPositions = positionCheck.data.positions.filter(pos => 
-        parseFloat(pos.netqty || 0) !== 0
-      );
-      
-      if (openPositions.length > 0) {
-        throw new Error(`${openPositions.length} positions still open after close attempt`);
-      }
-    }
-    
-    // Step 4: Toggle analyzer mode
-    const toggleResult = await makeOpenAlgoRequest(instance, 'analyzer/toggle', 'POST', { mode: true });
-    if (toggleResult.status !== 'success') {
-      throw new Error('Failed to enable analyzer mode');
-    }
-    
-    // Step 5: Verify analyzer mode
-    const verifyResult = await makeOpenAlgoRequest(instance, 'analyzer');
-    if (verifyResult.status !== 'success' || verifyResult.data?.mode !== 'analyze') {
-      throw new Error('Failed to verify analyzer mode activation');
-    }
-    
-    // Update database
-    await dbAsync.run(
-      'UPDATE instances SET is_analyzer_mode = 1, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
-      [instance.id]
-    );
-    
-    console.log(`✅ Auto Safe-Switch completed for instance ${instance.id}: ${reason}`);
-    
-  } catch (error) {
-    console.error(`❌ Auto Safe-Switch failed for instance ${instance.id}:`, error.message);
-  }
-}
+// Auto-switch implementation moved to `backend/lib/instance-updater.js` (autoSwitchToAnalyzer)
 
 // Schedule instance data updates every 30 seconds (as per architecture requirements)
-cron.schedule('*/30 * * * * *', updateInstancesData);
+cron.schedule('*/30 * * * * *', () => updater_updateInstancesData(dbAsync, makeOpenAlgoRequest));
 
 // Schedule health checks every 20 minutes (as per architecture requirements)
-cron.schedule('*/20 * * * *', performHealthChecks);
+cron.schedule('*/20 * * * *', () => updater_performHealthChecks(dbAsync, makeOpenAlgoRequest));
 
 // Run initial data update after 3 seconds
 setTimeout(() => {
   console.log('🔄 Running initial instance data update...');
-  updateInstancesData();
+  updater_updateInstancesData(dbAsync, makeOpenAlgoRequest);
 }, 3000);
 
 // Initialize and start server
