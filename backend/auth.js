@@ -4,8 +4,27 @@ import session from 'express-session';
 import ConnectSqlite3 from 'connect-sqlite3';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import crypto from 'crypto';
 
 const SQLiteStore = ConnectSqlite3(session);
+
+let cachedSessionSecret;
+
+function getSessionSecret() {
+  if (cachedSessionSecret) {
+    return cachedSessionSecret;
+  }
+
+  const provided = process.env.SESSION_SECRET;
+  if (provided && provided.length >= 32) {
+    cachedSessionSecret = provided;
+    return cachedSessionSecret;
+  }
+
+  cachedSessionSecret = crypto.randomBytes(64).toString('hex');
+  console.warn('⚠️  SESSION_SECRET not set or too short. Generated a temporary secret for this runtime.');
+  return cachedSessionSecret;
+}
 
 // Load Google OAuth credentials
 function loadGoogleCredentials(basePath) {
@@ -39,16 +58,20 @@ export function configureAuth(app, basePath, dbAsync) {
   }
 
   // Session configuration
+  const secureCookie = process.env.NODE_ENV === 'production';
+
   app.use(session({
     store: new SQLiteStore({
       db: 'sessions.db',
       dir: join(basePath, 'database')
     }),
-    secret: process.env.SESSION_SECRET || 'simplifyed-trading-secret-key-2024',
+    secret: getSessionSecret(),
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === 'production',
+      secure: secureCookie,
+      httpOnly: true,
+      sameSite: secureCookie ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     }
   }));

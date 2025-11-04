@@ -8,11 +8,66 @@ import sqlite3 from 'sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { configureAuth, setupAuthRoutes, requireAuth } from './auth.js';
 import { updateInstancesData as updater_updateInstancesData, performHealthChecks as updater_performHealthChecks } from './lib/instance-updater.js';
 
 dotenv.config();
+
+const ALLOWED_HOST_PROTOCOLS = new Set(['http:', 'https:']);
+const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+
+function normalizeHostUrl(rawUrl) {
+  if (typeof rawUrl !== 'string') {
+    return null;
+  }
+
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!ALLOWED_HOST_PROTOCOLS.has(parsed.protocol)) {
+      return null;
+    }
+
+    parsed.username = '';
+    parsed.password = '';
+    parsed.hash = '';
+    parsed.search = '';
+
+    // Remove trailing slash to keep consistent storage
+    const sanitizedPath = parsed.pathname.replace(/\/+$/, '');
+    const base = `${parsed.origin}${sanitizedPath}`;
+    return base || parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeApiKey(apiKey) {
+  if (typeof apiKey !== 'string') {
+    return '';
+  }
+  return apiKey.trim();
+}
+
+function maskApiKey(apiKey) {
+  if (!apiKey) {
+    return '';
+  }
+  const visibleLength = Math.min(4, apiKey.length);
+  const hiddenLength = Math.max(0, apiKey.length - visibleLength);
+  return `${'*'.repeat(hiddenLength)}${apiKey.slice(-visibleLength)}`;
+}
+
+const requestTimeoutMs = (() => {
+  const parsed = Number.parseInt(process.env.OPENALGO_REQUEST_TIMEOUT_MS || '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REQUEST_TIMEOUT_MS;
+})();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -173,13 +228,18 @@ app.post('/api/instances', requireAuth, async (req, res) => {
   try {
     const { name, host_url, api_key, strategy_tag } = req.body;
     
-    if (!name || !host_url || !api_key) {
+    const trimmedName = typeof name === 'string' ? name.trim() : '';
+    const normalizedHostUrl = normalizeHostUrl(host_url);
+    const sanitizedApiKey = sanitizeApiKey(api_key);
+    const sanitizedStrategyTag = typeof strategy_tag === 'string' && strategy_tag.trim() !== '' ? strategy_tag.trim() : null;
+
+    if (!trimmedName || !normalizedHostUrl || !sanitizedApiKey) {
       return res.status(400).json({ error: 'Name, host_url, and api_key are required' });
     }
 
     const result = await dbAsync.run(
       'INSERT INTO instances (name, host_url, api_key, strategy_tag) VALUES (?, ?, ?, ?)',
-      [name, host_url, api_key, strategy_tag]
+      [trimmedName, normalizedHostUrl, sanitizedApiKey, sanitizedStrategyTag]
     );
 
     const newInstance = await dbAsync.get('SELECT * FROM instances WHERE id = ?', [result.lastID]);
@@ -204,10 +264,80 @@ app.put('/api/instances/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    
-    const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
-    const values = [...Object.values(updates), id];
-    
+
+    const allowedFields = new Set([
+      'name',
+      'host_url',
+      'api_key',
+      'strategy_tag',
+      'target_profit',
+      'target_loss',
+      'is_active',
+      'is_analyzer_mode'
+    ]);
+
+    const sanitizedUpdates = {};
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (!allowedFields.has(key)) {
+        continue;
+      }
+
+      switch (key) {
+        case 'name': {
+          const trimmed = typeof value === 'string' ? value.trim() : '';
+          if (!trimmed) {
+            return res.status(400).json({ error: 'Name cannot be empty' });
+          }
+          sanitizedUpdates.name = trimmed;
+          break;
+        }
+        case 'host_url': {
+          const normalized = normalizeHostUrl(value);
+          if (!normalized) {
+            return res.status(400).json({ error: 'Invalid host_url provided' });
+          }
+          sanitizedUpdates.host_url = normalized;
+          break;
+        }
+        case 'api_key': {
+          const sanitizedKey = sanitizeApiKey(value);
+          if (!sanitizedKey) {
+            return res.status(400).json({ error: 'API key cannot be empty' });
+          }
+          sanitizedUpdates.api_key = sanitizedKey;
+          break;
+        }
+        case 'strategy_tag': {
+          sanitizedUpdates.strategy_tag = typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+          break;
+        }
+        case 'target_profit':
+        case 'target_loss': {
+          const numericValue = Number.parseFloat(value);
+          if (!Number.isFinite(numericValue)) {
+            return res.status(400).json({ error: `${key} must be a numeric value` });
+          }
+          sanitizedUpdates[key] = numericValue;
+          break;
+        }
+        case 'is_active':
+        case 'is_analyzer_mode': {
+          sanitizedUpdates[key] = value ? 1 : 0;
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    if (Object.keys(sanitizedUpdates).length === 0) {
+      return res.status(400).json({ error: 'No valid fields provided for update' });
+    }
+
+    const fields = Object.keys(sanitizedUpdates).map(key => `${key} = ?`).join(', ');
+    const values = [...Object.values(sanitizedUpdates), id];
+
     await dbAsync.run(
       `UPDATE instances SET ${fields}, last_updated = CURRENT_TIMESTAMP WHERE id = ?`,
       values
@@ -241,13 +371,16 @@ app.get('/api/health', (req, res) => {
 app.post('/api/test-connection', requireAuth, async (req, res) => {
   try {
     const { host_url, api_key } = req.body;
-    
-    if (!host_url || !api_key) {
+
+    const normalizedHostUrl = normalizeHostUrl(host_url);
+    const sanitizedApiKey = sanitizeApiKey(api_key);
+
+    if (!normalizedHostUrl || !sanitizedApiKey) {
       return res.status(400).json({ error: 'host_url and api_key are required' });
     }
 
     // Create temporary instance object for testing
-    const testInstance = { host_url, api_key };
+    const testInstance = { host_url: normalizedHostUrl, api_key: sanitizedApiKey };
     
     // Test connection using ping endpoint
     const result = await makeOpenAlgoRequest(testInstance, 'ping');
@@ -574,24 +707,54 @@ app.delete('/api/users/:email', requireAuth, async (req, res) => {
 
 // Make OpenAlgo API request function
 async function makeOpenAlgoRequest(instance, endpoint, method = 'POST', data = {}) {
-  const url = `${instance.host_url.replace(/\/$/, '')}/api/v1/${endpoint}`;
-  const payload = { apikey: instance.api_key, ...data };
-  
-  console.log(`🔍 Making OpenAlgo request to: ${url}`);
-  console.log(`🔍 Payload:`, JSON.stringify(payload, null, 2));
-  
-  const response = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`HTTP ${response.status}: ${errorText}`);
+  const normalizedHostUrl = normalizeHostUrl(instance.host_url);
+  if (!normalizedHostUrl) {
+    throw new Error('Invalid host URL provided for OpenAlgo request');
   }
 
-  return response.json();
+  const sanitizedApiKey = sanitizeApiKey(instance.api_key);
+  if (!sanitizedApiKey) {
+    throw new Error('API key is required for OpenAlgo requests');
+  }
+
+  const normalizedEndpoint = typeof endpoint === 'string' ? endpoint.replace(/^\//, '') : '';
+  if (!normalizedEndpoint) {
+    throw new Error('Endpoint is required for OpenAlgo requests');
+  }
+
+  const baseData = data && typeof data === 'object' ? data : {};
+  const url = `${normalizedHostUrl}/api/v1/${normalizedEndpoint}`;
+  const payload = { ...baseData, apikey: sanitizedApiKey };
+  const maskedPayload = { ...baseData, apikey: maskApiKey(payload.apikey) };
+
+  console.log(`🔍 Making OpenAlgo request to: ${url}`);
+  console.log(`🔍 Payload preview:`, maskedPayload);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: method && method.toUpperCase() === 'GET' ? undefined : JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error(`Request to ${url} timed out after ${requestTimeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // P&L helper functions are implemented in `backend/lib/pnl.js` and imported above.

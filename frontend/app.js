@@ -1,5 +1,36 @@
 // Configuration
 const API_BASE = 'http://localhost:3000/api';
+const ALLOWED_PROTOCOLS = new Set(['http:', 'https:']);
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function sanitizeUrl(url) {
+    if (typeof url !== 'string') {
+        return '#';
+    }
+    const trimmed = url.trim();
+    if (!trimmed) {
+        return '#';
+    }
+
+    try {
+        const parsed = new URL(trimmed, window.location.origin);
+        if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
+            return '#';
+        }
+        parsed.hash = '';
+        return parsed.toString();
+    } catch {
+        return '#';
+    }
+}
 
 // Global state
 let user = null;
@@ -369,27 +400,36 @@ function renderInstances() {
 
 // Render card view
 function renderCardView(container) {
-    container.innerHTML = filteredInstances.map(instance => `
+    container.innerHTML = filteredInstances.map(instance => {
+        const instanceId = Number.parseInt(instance.id, 10);
+        const safeInstanceId = Number.isNaN(instanceId) ? 0 : instanceId;
+        const safeName = escapeHtml(instance.name || 'Unnamed');
+        const safeHostUrl = sanitizeUrl(instance.host_url || '');
+        const safeStrategyTag = instance.strategy_tag ? escapeHtml(instance.strategy_tag) : '';
+        const isAnalyzer = Boolean(instance.is_analyzer_mode);
+        const lastUpdated = instance.last_updated ? new Date(instance.last_updated).toLocaleDateString() : 'Unknown';
+        
+        return `
         <div class="bg-slate-800 border border-slate-600 rounded-lg p-4 hover:border-slate-500 transition-all duration-200">
             <!-- Header with checkbox and mode indicator -->
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center space-x-2">
-                    <input type="checkbox" class="instance-checkbox" data-id="${instance.id}" onchange="handleInstanceSelection(${instance.id}, this.checked)">
+                    <input type="checkbox" class="instance-checkbox" data-id="${safeInstanceId}" onchange="handleInstanceSelection(${safeInstanceId}, this.checked)">
                     <div class="flex items-center space-x-2">
-                        <h3 class="text-white font-semibold text-base">${instance.name}</h3>
-                        <a href="${instance.host_url}" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-white transition-colors duration-200">
+                        <h3 class="text-white font-semibold text-base">${safeName}</h3>
+                        <a href="${safeHostUrl}" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-white transition-colors duration-200">
                             <i data-lucide="external-link" class="w-4 h-4"></i>
                         </a>
                     </div>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <div class="w-2 h-2 rounded-full ${instance.is_analyzer_mode ? 'bg-orange-400' : 'bg-green-400'}"></div>
-                    <span class="${instance.is_analyzer_mode ? 'text-orange-400' : 'text-green-400'} text-sm font-medium">${instance.is_analyzer_mode ? 'Analyzer' : 'Live'}</span>
+                    <div class="w-2 h-2 rounded-full ${isAnalyzer ? 'bg-orange-400' : 'bg-green-400'}"></div>
+                    <span class="${isAnalyzer ? 'text-orange-400' : 'text-green-400'} text-sm font-medium">${isAnalyzer ? 'Analyzer' : 'Live'}</span>
                 </div>
             </div>
             
             <!-- Strategy tag -->
-            ${instance.strategy_tag ? `<p class="text-slate-400 text-sm mb-4">${instance.strategy_tag}</p>` : '<div class="mb-4"></div>'}
+            ${safeStrategyTag ? `<p class="text-slate-400 text-sm mb-4">${safeStrategyTag}</p>` : '<div class="mb-4"></div>'}
             
             <!-- Balance and P&L row -->
             <div class="grid grid-cols-2 gap-4 mb-4">
@@ -419,23 +459,24 @@ function renderCardView(container) {
             <div class="mb-4">
                 <p class="text-slate-500 text-xs flex items-center">
                     <i data-lucide="clock" class="w-3 h-3 mr-1"></i>
-                    Updated ${new Date(instance.last_updated).toLocaleDateString()}
+                    Updated ${escapeHtml(lastUpdated)}
                 </p>
             </div>
             
             <!-- Action buttons -->
             <div class="flex space-x-2">
-                <button onclick="refreshInstance(${instance.id})" class="flex-1 bg-slate-700 text-slate-300 py-2 px-4 rounded-lg text-sm hover:bg-slate-600 transition-colors duration-200 flex items-center justify-center space-x-1">
+                <button onclick="refreshInstance(${safeInstanceId})" class="flex-1 bg-slate-700 text-slate-300 py-2 px-4 rounded-lg text-sm hover:bg-slate-600 transition-colors duration-200 flex items-center justify-center space-x-1">
                     <i data-lucide="refresh-cw" class="w-4 h-4"></i>
                     <span>Refresh</span>
                 </button>
-                <button onclick="toggleAnalyzerMode(${instance.id}, ${!instance.is_analyzer_mode})" class="flex-1 ${instance.is_analyzer_mode ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-600 hover:bg-amber-700'} text-white py-2 px-4 rounded-lg text-sm transition-colors duration-200 flex items-center justify-center space-x-1">
+                <button onclick="toggleAnalyzerMode(${safeInstanceId}, ${!isAnalyzer})" class="flex-1 ${isAnalyzer ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-600 hover:bg-amber-700'} text-white py-2 px-4 rounded-lg text-sm transition-colors duration-200 flex items-center justify-center space-x-1">
                     <i data-lucide="power" class="w-4 h-4"></i>
-                    <span>${instance.is_analyzer_mode ? 'Go Live' : 'Analyzer'}</span>
+                    <span>${isAnalyzer ? 'Go Live' : 'Analyzer'}</span>
                 </button>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
     
     lucide.createIcons();
 }
@@ -463,32 +504,46 @@ function renderTableView(container) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${filteredInstances.map((instance, index) => `
+                    ${filteredInstances.map((instance) => {
+                        const instanceId = Number.parseInt(instance.id, 10);
+                        const safeInstanceId = Number.isNaN(instanceId) ? 0 : instanceId;
+                        const safeName = escapeHtml(instance.name || 'Unnamed');
+                        const safeHostUrl = sanitizeUrl(instance.host_url || '');
+                        const hostLabel = escapeHtml(instance.host_url || '');
+                        const safeStrategyTag = instance.strategy_tag ? escapeHtml(instance.strategy_tag) : '';
+                        const isAnalyzer = Boolean(instance.is_analyzer_mode);
+                        const isActive = Boolean(instance.is_active);
+                        const pnlValue = (instance.total_pnl ?? instance.current_pnl) || 0;
+                        const pnlClass = pnlValue >= 0 ? 'text-green-400' : 'text-red-400';
+                        const realized = instance.realized_pnl;
+                        const unrealized = instance.unrealized_pnl;
+
+                        return `
                         <tr class="border-t border-slate-700/50 hover:bg-slate-700/20 transition-all duration-200">
                             <td class="p-4">
-                                <input type="checkbox" class="instance-checkbox" data-id="${instance.id}" onchange="handleInstanceSelection(${instance.id}, this.checked)">
+                                <input type="checkbox" class="instance-checkbox" data-id="${safeInstanceId}" onchange="handleInstanceSelection(${safeInstanceId}, this.checked)">
                             </td>
                             <td class="p-4">
-                                <div class="text-white font-medium">${instance.name}</div>
+                                <div class="text-white font-medium">${safeName}</div>
                             </td>
                             <td class="p-4">
-                                <a href="${instance.host_url}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 text-sm transition-colors duration-200">
-                                    ${instance.host_url}
+                                <a href="${safeHostUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 text-sm transition-colors duration-200">
+                                    ${hostLabel}
                                 </a>
                             </td>
                             <td class="p-4">
-                                ${instance.strategy_tag ? `<span class="inline-block px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full">${instance.strategy_tag}</span>` : '<span class="text-slate-500">-</span>'}
+                                ${safeStrategyTag ? `<span class="inline-block px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full">${safeStrategyTag}</span>` : '<span class="text-slate-500">-</span>'}
                             </td>
                             <td class="p-4">
                                 <div class="text-white">₹${formatCurrency(instance.current_balance)}</div>
                             </td>
                             <td class="p-4">
-                                <div class="${(instance.total_pnl || instance.current_pnl) >= 0 ? 'text-green-400' : 'text-red-400'}">
-                                    ${(instance.total_pnl || instance.current_pnl) >= 0 ? '+' : ''}₹${formatCurrency(instance.total_pnl || instance.current_pnl)}
+                                <div class="${pnlClass}">
+                                    ${pnlValue >= 0 ? '+' : ''}₹${formatCurrency(pnlValue)}
                                 </div>
-                                ${(instance.realized_pnl !== undefined && instance.unrealized_pnl !== undefined) ? `
+                                ${(realized !== undefined && unrealized !== undefined) ? `
                                 <div class="text-xs text-slate-400 mt-1">
-                                    R: ₹${formatCurrency(instance.realized_pnl)} | U: ₹${formatCurrency(instance.unrealized_pnl)}
+                                    R: ₹${formatCurrency(realized)} | U: ₹${formatCurrency(unrealized)}
                                 </div>` : ''}
                             </td>
                             <td class="p-4">
@@ -499,33 +554,34 @@ function renderTableView(container) {
                             </td>
                             <td class="p-4">
                                 <label class="flex items-center space-x-2 cursor-pointer">
-                                    <input type="checkbox" ${instance.is_analyzer_mode ? 'checked' : ''} 
-                                           onchange="toggleAnalyzerMode(${instance.id}, this.checked)" 
+                                    <input type="checkbox" ${isAnalyzer ? 'checked' : ''} 
+                                           onchange="toggleAnalyzerMode(${safeInstanceId}, this.checked)" 
                                            class="sr-only">
-                                    <div class="w-10 h-5 rounded-full transition-colors duration-200 ${instance.is_analyzer_mode ? 'status-analyzer' : 'status-live'}">
-                                        <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ${instance.is_analyzer_mode ? 'translate-x-5' : 'translate-x-0.5'} translate-y-0.5"></div>
+                                    <div class="w-10 h-5 rounded-full transition-colors duration-200 ${isAnalyzer ? 'status-analyzer' : 'status-live'}">
+                                        <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ${isAnalyzer ? 'translate-x-5' : 'translate-x-0.5'} translate-y-0.5"></div>
                                     </div>
-                                    <span class="text-sm text-slate-300">${instance.is_analyzer_mode ? 'Analyzer' : 'Live'}</span>
+                                    <span class="text-sm text-slate-300">${isAnalyzer ? 'Analyzer' : 'Live'}</span>
                                 </label>
                             </td>
                             <td class="p-4">
                                 <div class="flex items-center space-x-2">
-                                    <div class="w-2 h-2 rounded-full ${instance.is_active ? 'bg-green-400 animate-pulse' : 'bg-red-400'}"></div>
-                                    <span class="text-slate-300 text-sm">${instance.is_active ? 'Online' : 'Offline'}</span>
+                                    <div class="w-2 h-2 rounded-full ${isActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}"></div>
+                                    <span class="text-slate-300 text-sm">${isActive ? 'Online' : 'Offline'}</span>
                                 </div>
                             </td>
                             <td class="p-4">
                                 <div class="flex items-center space-x-1">
-                                    <button onclick="editInstance(${instance.id})" class="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200">
+                                    <button onclick="editInstance(${safeInstanceId})" class="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200">
                                         <i data-lucide="edit" class="w-4 h-4"></i>
                                     </button>
-                                    <button onclick="deleteInstance(${instance.id})" class="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200">
+                                    <button onclick="deleteInstance(${safeInstanceId})" class="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200">
                                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                                     </button>
                                 </div>
                             </td>
                         </tr>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -551,26 +607,39 @@ function renderAdminInstances(instanceList) {
         return;
     }
     
-    container.innerHTML = instanceList.map(instance => `
+    container.innerHTML = instanceList.map(instance => {
+        const instanceId = Number.parseInt(instance.id, 10);
+        const safeInstanceId = Number.isNaN(instanceId) ? 0 : instanceId;
+        const safeName = escapeHtml(instance.name || 'Unnamed');
+        const safeHostUrl = sanitizeUrl(instance.host_url || '');
+        const hostLabel = escapeHtml(instance.host_url || '');
+        const safeStrategyTag = instance.strategy_tag ? `<span class="px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full">${escapeHtml(instance.strategy_tag)}</span>` : '';
+        const isActive = Boolean(instance.is_active);
+        const pnlValue = (instance.total_pnl ?? instance.current_pnl) || 0;
+        const pnlClass = pnlValue >= 0 ? 'text-green-400' : 'text-red-400';
+        const realized = instance.realized_pnl;
+        const unrealized = instance.unrealized_pnl;
+
+        return `
         <div class="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 hover:border-slate-600/50 transition-all duration-200">
             <div class="flex items-center justify-between">
                 <div class="flex-1">
                     <div class="flex items-center space-x-4">
                         <div class="flex-1">
-                            <h3 class="text-white font-semibold text-lg mb-1">${instance.name}</h3>
-                            <a href="${instance.host_url}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 text-sm mb-2 inline-block transition-colors duration-200">
-                                ${instance.host_url}
+                            <h3 class="text-white font-semibold text-lg mb-1">${safeName}</h3>
+                            <a href="${safeHostUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 text-sm mb-2 inline-block transition-colors duration-200">
+                                ${hostLabel}
                             </a>
                             <div class="flex items-center space-x-4 text-sm text-slate-300">
-                                ${instance.strategy_tag ? `<span class="px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full">${instance.strategy_tag}</span>` : ''}
+                                ${safeStrategyTag}
                                 <span>Balance: ₹${formatCurrency(instance.current_balance)}</span>
-                                <span class="${(instance.total_pnl || instance.current_pnl) >= 0 ? 'text-green-400' : 'text-red-400'}">
-                                    P&L: ${(instance.total_pnl || instance.current_pnl) >= 0 ? '+' : ''}₹${formatCurrency(instance.total_pnl || instance.current_pnl)}
-                                    ${(instance.realized_pnl !== undefined && instance.unrealized_pnl !== undefined) ? ` (R: ₹${formatCurrency(instance.realized_pnl)}, U: ₹${formatCurrency(instance.unrealized_pnl)})` : ''}
+                                <span class="${pnlClass}">
+                                    P&L: ${pnlValue >= 0 ? '+' : ''}₹${formatCurrency(pnlValue)}
+                                    ${(realized !== undefined && unrealized !== undefined) ? ` (R: ₹${formatCurrency(realized)}, U: ₹${formatCurrency(unrealized)})` : ''}
                                 </span>
                                 <span class="flex items-center space-x-1">
-                                    <div class="w-2 h-2 rounded-full ${instance.is_active ? 'bg-green-400' : 'bg-red-400'}"></div>
-                                    <span>${instance.is_active ? 'Online' : 'Offline'}</span>
+                                    <div class="w-2 h-2 rounded-full ${isActive ? 'bg-green-400' : 'bg-red-400'}"></div>
+                                    <span>${isActive ? 'Online' : 'Offline'}</span>
                                 </span>
                             </div>
                         </div>
@@ -584,18 +653,19 @@ function renderAdminInstances(instanceList) {
                     </div>
                 </div>
                 <div class="flex items-center space-x-2 ml-6">
-                    <button onclick="editInstance(${instance.id})" class="px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all duration-200 flex items-center space-x-2">
+                    <button onclick="editInstance(${safeInstanceId})" class="px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all duration-200 flex items-center space-x-2">
                         <i data-lucide="edit" class="w-4 h-4"></i>
                         <span>Edit</span>
                     </button>
-                    <button onclick="deleteInstance(${instance.id})" class="px-4 py-2 bg-red-500/20 border border-red-500/30 text-red-300 rounded-lg hover:bg-red-500/30 transition-all duration-200 flex items-center space-x-2">
+                    <button onclick="deleteInstance(${safeInstanceId})" class="px-4 py-2 bg-red-500/20 border border-red-500/30 text-red-300 rounded-lg hover:bg-red-500/30 transition-all duration-200 flex items-center space-x-2">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                         <span>Delete</span>
                     </button>
                 </div>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
     
     lucide.createIcons();
 }
@@ -757,12 +827,14 @@ async function testConnection() {
         const result = await response.json();
         
         if (result.status === 'success') {
-            statusDiv.innerHTML = `<span class="text-green-400">✓ Connection successful! Broker: ${result.broker || 'Unknown'}</span>`;
+            const safeBroker = escapeHtml(result.broker || 'Unknown');
+            statusDiv.innerHTML = `<span class="text-green-400">✓ Connection successful! Broker: ${safeBroker}</span>`;
         } else {
-            statusDiv.innerHTML = `<span class="text-red-400">✗ Connection failed: ${result.message || result.error}</span>`;
+            const failureMessage = escapeHtml(result.message || result.error || 'Unknown error');
+            statusDiv.innerHTML = `<span class="text-red-400">✗ Connection failed: ${failureMessage}</span>`;
         }
     } catch (error) {
-        statusDiv.innerHTML = `<span class="text-red-400">✗ Connection failed: ${error.message}</span>`;
+        statusDiv.innerHTML = `<span class="text-red-400">✗ Connection failed: ${escapeHtml(error.message || 'Unexpected error')}</span>`;
     } finally {
         testBtn.textContent = 'Test';
         testBtn.disabled = false;
@@ -896,27 +968,42 @@ function renderUsers() {
         return;
     }
 
-    container.innerHTML = users.map((user, index) => `
+    container.innerHTML = users.map((user, index) => {
+        const safeEmail = escapeHtml(user.email || '');
+        const emailInitial = escapeHtml((user.email || '?').charAt(0).toUpperCase());
+        const addedDate = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown';
+        const buttonMarkup = index === 0
+            ? '<span class="px-3 py-1 bg-green-500/20 text-green-300 text-xs rounded-full border border-green-500/30">Admin</span>'
+            : `<button class="remove-user-btn p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200" data-email="${escapeHtml(user.email)}"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`;
+
+        return `
         <div class="flex items-center justify-between p-6 hover:bg-slate-700/20 transition-all duration-200">
             <div class="flex items-center space-x-4">
                 <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl flex items-center justify-center">
-                    <span class="text-white font-semibold text-sm">${user.email.charAt(0).toUpperCase()}</span>
+                    <span class="text-white font-semibold text-sm">${emailInitial}</span>
                 </div>
                 <div>
-                    <div class="text-white font-medium">${user.email}</div>
-                    <div class="text-slate-400 text-sm">Added ${new Date(user.created_at).toLocaleDateString()}</div>
+                    <div class="text-white font-medium">${safeEmail}</div>
+                    <div class="text-slate-400 text-sm">Added ${escapeHtml(addedDate)}</div>
                 </div>
             </div>
             <div class="flex items-center space-x-2">
-                ${index === 0 ? 
-                    '<span class="px-3 py-1 bg-green-500/20 text-green-300 text-xs rounded-full border border-green-500/30">Admin</span>' : 
-                    '<button onclick="removeUser(\'' + user.email + '\')" class="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200"><i data-lucide="trash-2" class="w-4 h-4"></i></button>'
-                }
+                ${buttonMarkup}
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
     
     lucide.createIcons();
+
+    container.querySelectorAll('.remove-user-btn').forEach(button => {
+        button.addEventListener('click', (event) => {
+            const emailToRemove = event.currentTarget.dataset.email;
+            if (emailToRemove) {
+                removeUser(emailToRemove);
+            }
+        });
+    });
 }
 
 // Add user
