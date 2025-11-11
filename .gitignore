@@ -320,7 +320,6 @@ docs/dist/
 !DATABASE_SCHEMA.md
 !package.json
 !backend/package.json
-!frontend/package.json
 !Requirements/
 !.gitignore
 !LICENSE

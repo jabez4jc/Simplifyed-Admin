@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F&O Detection Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e293b; color: #e2e8f0; }
+        .result { background: #334155; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .success { border-left: 4px solid #10b981; }
+        .error { border-left: 4px solid #ef4444; }
+        button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>F&O Eligibility Detection Test</h1>
+    <p>Testing the enhanced F&O detection system</p>
+
+    <div>
+        <button onclick="runTest('NIFTY')">Test NIFTY</button>
+        <button onclick="runTest('RELIANCE')">Test RELIANCE</button>
+        <button onclick="runTest('BANKNIFTY')">Test BANKNIFTY</button>
+        <button onclick="runTest('TCS')">Test TCS</button>
+        <button onclick="runTest('HDFC')">Test HDFC</button>
+        <button onclick="clearResults()">Clear</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+
+        async function detectSymbolTypeEnhanced(symbol) {
+            if (!symbol || symbol.trim() === '') {
+                return {
+                    type: 'EQUITY',
+                    canTradeEquity: true,
+                    canTradeFno: false,
+                    isFnoEligible: false,
+                    hasOptions: false,
+                    hasFutures: false,
+                    displayType: 'EQUITY',
+                    searchResults: []
+                };
+            }
+
+            const symbolUpper = symbol.toUpperCase().trim();
+
+            // Check cache first (24-hour expiry)
+            const cacheKey = `fno_cache_${symbolUpper}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    const cachedData = JSON.parse(cached);
+                    const cacheTime = new Date(cachedData.cachedAt).getTime();
+                    const now = new Date().getTime();
+                    const hoursPassed = (now - cacheTime) / (1000 * 60 * 60);
+
+                    if (hoursPassed < 24) {
+                        console.log(`📋 Using cached F&O data for ${symbolUpper}`);
+                        return cachedData.result;
+                    }
+                } catch (e) {
+                    // Invalid cache, continue with fresh fetch
+                }
+            }
+
+            try {
+                console.log(`🔍 Fetching F&O eligibility for ${symbolUpper} from OpenAlgo API`);
+
+                const params = new URLSearchParams({ q: symbolUpper });
+                const response = await fetch(`${API_BASE}/api/symbols/search?${params}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Search failed: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                const results = data.data || [];
+
+                if (results.length === 0) {
+                    const result = {
+                        type: 'EQUITY',
+                        canTradeEquity: true,
+                        canTradeFno: false,
+                        isFnoEligible: false,
+                        hasOptions: false,
+                        hasFutures: false,
+                        displayType: 'EQUITY',
+                        searchResults: results
+                    };
+
+                    localStorage.setItem(cacheKey, JSON.stringify({
+                        cachedAt: new Date().toISOString(),
+                        result: result
+                    }));
+
+                    return result;
+                }
+
+                // Analyze results to determine F&O eligibility
+                let hasOptions = false;
+                let hasFutures = false;
+                let hasEquity = false;
+                let isIndex = false;
+
+                // Group results by underlying name
+                const byName = {};
+                results.forEach(item => {
+                    const name = (item.name || item.symbol || '').toUpperCase();
+                    if (!byName[name]) {
+                        byName[name] = [];
+                    }
+                    byName[name].push(item);
+                });
+
+                // Check each group
+                Object.keys(byName).forEach(name => {
+                    const group = byName[name];
+                    const firstItem = group[0];
+
+                    // Check for options
+                    const hasOptionsInGroup = group.some(item => {
+                        const instType = (item.instrument_type || '').toUpperCase();
+                        return instType === 'OPTIDX' || instType === 'OPTSTK' ||
+                               (item.symbol || '').includes('CE') || (item.symbol || '').includes('PE');
+                    });
+
+                    // Check for futures
+                    const hasFuturesInGroup = group.some(item => {
+                        const instType = (item.instrument_type || '').toUpperCase();
+                        const sym = (item.symbol || '').toUpperCase();
+                        return instType === 'FUT' || instType === 'FUTIDX' || instType === 'FUTSTK' ||
+                               sym.includes('FUT') || item.expiry || item.expiry_date;
+                    });
+
+                    // Check for equity
+                    const hasEquityInGroup = group.some(item => {
+                        const sym = (item.symbol || '').toUpperCase();
+                        const name = (item.name || '').toUpperCase();
+                        return sym === name && !item.expiry && !item.expiry_date &&
+                               !sym.includes('CE') && !sym.includes('PE') && !sym.includes('FUT');
+                    });
+
+                    if (hasOptionsInGroup) hasOptions = true;
+                    if (hasFuturesInGroup) hasFutures = true;
+                    if (hasEquityInGroup) hasEquity = true;
+
+                    // Check if it's an index
+                    if (group.some(item => (item.exchange || '').toUpperCase() === 'NSE_INDEX')) {
+                        isIndex = true;
+                    }
+                });
+
+                // Determine symbol type
+                let type = 'EQUITY';
+                let displayType = 'EQUITY';
+                let canTradeEquity = hasEquity;
+                let canTradeFno = hasFutures || hasOptions;
+                let isFnoEligible = canTradeFno;
+
+                // Check if this is a direct options contract
+                if (symbolUpper.includes('CE') || symbolUpper.includes('PE')) {
+                    type = 'OPTIONS';
+                    displayType = 'OPTIONS';
+                    canTradeEquity = false;
+                    canTradeFno = false;
+                    isFnoEligible = false;
+                }
+                // Check if this is a futures contract
+                else if (results.some(item => (item.symbol || '').toUpperCase().includes('FUT'))) {
+                    type = 'FUTURE';
+                    displayType = 'FUTURE';
+                    canTradeEquity = false;
+                    canTradeFno = true;
+                    isFnoEligible = true;
+                }
+                // Check if this is an index
+                else if (isIndex) {
+                    type = 'INDEX';
+                    displayType = 'INDEX';
+                    canTradeEquity = true;
+                    canTradeFno = true;
+                    isFnoEligible = true;
+                }
+                // Regular equity
+                else {
+                    type = 'EQUITY';
+                    displayType = 'EQUITY';
+                    canTradeEquity = true;
+                    canTradeFno = hasFutures || hasOptions;
+                    isFnoEligible = hasFutures || hasOptions;
+                }
+
+                const result = {
+                    type: type,
+                    canTradeEquity: canTradeEquity,
+                    canTradeFno: canTradeFno,
+                    isFnoEligible: isFnoEligible,
+                    hasOptions: hasOptions,
+                    hasFutures: hasFutures,
+                    displayType: displayType,
+                    searchResults: results
+                };
+
+                // Cache the result
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    cachedAt: new Date().toISOString(),
+                    result: result
+                }));
+
+                console.log(`✅ F&O detection complete for ${symbolUpper}:`, {
+                    type: type,
+                    hasEquity: canTradeEquity,
+                    hasFutures: hasFutures,
+                    hasOptions: hasOptions
+                });
+
+                return result;
+
+            } catch (error) {
+                console.error('Error detecting F&O eligibility:', error);
+
+                const result = {
+                    type: 'EQUITY',
+                    canTradeEquity: true,
+                    canTradeFno: false,
+                    isFnoEligible: false,
+                    hasOptions: false,
+                    hasFutures: false,
+                    displayType: 'EQUITY',
+                    searchResults: [],
+                    error: error.message
+                };
+
+                return result;
+            }
+        }
+
+        async function runTest(symbol) {
+            const resultsDiv = document.getElementById('results');
+            const startTime = Date.now();
+
+            try {
+                const result = await detectSymbolTypeEnhanced(symbol);
+                const endTime = Date.now();
+                const duration = endTime - startTime;
+
+                const success = !result.error;
+                const div = document.createElement('div');
+                div.className = `result ${success ? 'success' : 'error'}`;
+
+                div.innerHTML = `
+                    <h3>${symbol} ${success ? '✅' : '❌'}</h3>
+                    <p><strong>Duration:</strong> ${duration}ms</p>
+                    <p><strong>Type:</strong> ${result.type}</p>
+                    <p><strong>Display Type:</strong> ${result.displayType}</p>
+                    <p><strong>Can Trade Equity:</strong> ${result.canTradeEquity}</p>
+                    <p><strong>Can Trade F&O:</strong> ${result.canTradeFno}</p>
+                    <p><strong>Is F&O Eligible:</strong> ${result.isFnoEligible}</p>
+                    <p><strong>Has Options:</strong> ${result.hasOptions}</p>
+                    <p><strong>Has Futures:</strong> ${result.hasFutures}</p>
+                    <p><strong>Search Results Count:</strong> ${result.searchResults?.length || 0}</p>
+                    ${result.error ? `<p style="color: #ef4444;"><strong>Error:</strong> ${result.error}</p>` : ''}
+                `;
+
+                resultsDiv.appendChild(div);
+            } catch (error) {
+                const div = document.createElement('div');
+                div.className = 'result error';
+                div.innerHTML = `<h3>${symbol} ❌</h3><p><strong>Error:</strong> ${error.message}</p>`;
+                resultsDiv.appendChild(div);
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

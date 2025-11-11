@@ -1,0 +1,1994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simplifyed Trading Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .loading { opacity: 0.5; pointer-events: none; }
+        .card-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+        .table-view { display: table; width: 100%; }
+        .slide-enter { transform: translateY(-20px); opacity: 0; }
+        .slide-enter-active { transform: translateY(0); opacity: 1; transition: all 0.3s ease; }
+        .modal { display: none; }
+        .modal.active { display: flex; }
+        .animate-pulse-slow { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .status-live { background: linear-gradient(135deg, #10b981, #059669); }
+        .status-analyzer { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .view-btn { 
+            color: #94a3b8; 
+            background-color: transparent; 
+        }
+        .view-btn.active { 
+            color: #f8fafc; 
+            background-color: rgba(59, 130, 246, 0.2); 
+            border: 1px solid rgba(59, 130, 246, 0.3); 
+        }
+        .view-btn:hover:not(.active) { 
+            color: #e2e8f0; 
+            background-color: rgba(71, 85, 105, 0.3); 
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 min-h-screen">
+    
+    <!-- Loading Overlay -->
+    <div id="loading" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="text-center">
+            <div class="animate-spin w-12 h-12 mx-auto mb-4">
+                <i data-lucide="loader-2" class="w-12 h-12 text-blue-400"></i>
+            </div>
+            <p class="text-white text-lg">Loading Simplifyed Dashboard...</p>
+        </div>
+    </div>
+
+    <!-- Login Page -->
+    <div id="login-page" class="hidden fixed inset-0 z-40 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 flex items-center justify-center p-4">
+        <div class="w-full max-w-md">
+            <div class="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 text-center shadow-2xl">
+                <!-- Logo -->
+                <div class="w-24 h-24 bg-gradient-to-br from-blue-400 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                    <i data-lucide="trending-up" class="w-12 h-12 text-white"></i>
+                </div>
+
+                <!-- Title -->
+                <h1 class="text-4xl font-bold text-white mb-3">Simplifyed</h1>
+                <p class="text-slate-300 text-lg mb-8">Trading Management Dashboard</p>
+
+                <!-- Sign In Button -->
+                <a href="http://localhost:3000/auth/google" class="inline-flex items-center justify-center space-x-3 w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 transform">
+                    <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    <span class="text-lg">Sign in with Google</span>
+                </a>
+
+                <!-- Footer -->
+                <div class="mt-8 space-y-2">
+                    <p class="text-slate-400 text-sm">
+                        Secure authentication via Google OAuth
+                    </p>
+                    <p class="text-slate-500 text-xs">
+                        © 2025 JeNeFa AdVenture. All rights reserved.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Skip to main content link -->
+    <a href="#main-content" class="skip-link">
+        Skip to main content
+    </a>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="hidden">
+        <!-- Mobile Sidebar Overlay -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-slate-950/50 z-40 md:hidden hidden" onclick="toggleSidebar()"></div>
+
+        <!-- Navigation Sidebar -->
+        <nav id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-slate-800/50 backdrop-blur-xl border-r border-slate-700/50 p-6 z-40 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out sidebar-expanded">
+            <!-- Sidebar Header with Collapse Toggle -->
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="trending-up" class="w-5 h-5 text-white"></i>
+                    </div>
+                    <div class="sidebar-text">
+                        <h1 class="text-white font-bold text-lg">Simplifyed</h1>
+                        <p class="text-slate-400 text-sm">Trading Dashboard</p>
+                    </div>
+                </div>
+                <button onclick="toggleSidebarCollapse()" class="hidden md:block text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700/30 transition-all duration-200" aria-label="Toggle sidebar collapse">
+                    <i data-lucide="chevron-left" class="w-5 h-5 transform transition-transform duration-200" id="sidebar-collapse-icon"></i>
+                </button>
+            </div>
+
+            <nav class="space-y-2" role="navigation" aria-label="Main navigation">
+                <a href="#" onclick="showView('dashboard'); closeSidebar();" class="nav-item dashboard-nav active flex items-center space-x-3 px-4 py-3 rounded-lg text-white bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-all duration-200 group" aria-label="Navigate to Dashboard" title="Dashboard">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5 flex-shrink-0" aria-hidden="true"></i>
+                    <span class="sidebar-text whitespace-nowrap">Dashboard</span>
+                    <span class="sidebar-tooltip hidden absolute left-20 bg-slate-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap shadow-lg z-50">Dashboard</span>
+                </a>
+                <a href="#" onclick="showView('admin'); closeSidebar();" class="nav-item admin-nav flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/30 transition-all duration-200 group" aria-label="Navigate to Instances" title="Instances">
+                    <i data-lucide="server" class="w-5 h-5 flex-shrink-0" aria-hidden="true"></i>
+                    <span class="sidebar-text whitespace-nowrap">Instances</span>
+                    <span class="sidebar-tooltip hidden absolute left-20 bg-slate-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap shadow-lg z-50">Instances</span>
+                </a>
+                <a href="#" onclick="showView('watchlists'); closeSidebar();" class="nav-item watchlists-nav flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/30 transition-all duration-200 group" aria-label="Navigate to Watchlists" title="Watchlists">
+                    <i data-lucide="list" class="w-5 h-5 flex-shrink-0" aria-hidden="true"></i>
+                    <span class="sidebar-text whitespace-nowrap">Watchlists</span>
+                    <span class="sidebar-tooltip hidden absolute left-20 bg-slate-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap shadow-lg z-50">Watchlists</span>
+                </a>
+                <a href="/scalper-terminal.html" class="nav-item flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/30 transition-all duration-200 group" aria-label="Navigate to Scalper Terminal" title="Scalper Terminal">
+                    <i data-lucide="zap" class="w-5 h-5 flex-shrink-0" aria-hidden="true"></i>
+                    <span class="sidebar-text whitespace-nowrap">Scalper Terminal</span>
+                    <span class="sidebar-tooltip hidden absolute left-20 bg-slate-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap shadow-lg z-50">Scalper Terminal</span>
+                </a>
+                <a href="#" onclick="showView('users'); closeSidebar();" class="nav-item users-nav flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/30 transition-all duration-200 group" style="display: none;" aria-label="Navigate to Users" title="Users">
+                    <i data-lucide="users" class="w-5 h-5 flex-shrink-0" aria-hidden="true"></i>
+                    <span class="sidebar-text whitespace-nowrap">Users</span>
+                    <span class="sidebar-tooltip hidden absolute left-20 bg-slate-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap shadow-lg z-50">Users</span>
+                </a>
+            </nav>
+
+            <!-- User Profile -->
+            <div class="absolute bottom-6 left-6 right-6">
+                <div class="flex items-center space-x-3 p-3 bg-slate-700/30 rounded-lg group relative">
+                    <img id="user-avatar" src="" alt="User" class="w-8 h-8 rounded-full flex-shrink-0">
+                    <div class="flex-1 min-w-0 sidebar-text">
+                        <p id="user-name" class="text-white text-sm font-medium truncate">Loading...</p>
+                        <p id="user-email" class="text-slate-400 text-xs truncate">Loading...</p>
+                    </div>
+                    <a href="http://localhost:3000/auth/logout" class="text-slate-400 hover:text-white flex-shrink-0" title="Logout">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </a>
+                    <span class="sidebar-tooltip hidden absolute left-20 bottom-0 bg-slate-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap shadow-lg z-50 transform -translate-y-1">
+                        Logout
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main id="main-content" class="hidden ml-0 md:ml-64 min-h-screen transition-all duration-300" style="margin-left: 256px;">
+            <!-- Mobile Header -->
+            <div class="md:hidden sticky top-0 z-30 bg-slate-800/50 backdrop-blur-xl border-b border-slate-700/50 p-4">
+                <button onclick="toggleSidebar()" class="text-white p-2" aria-label="Toggle navigation menu">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Dashboard View -->
+            <div id="dashboard-view" class="p-4 md:p-8">
+                <!-- Header -->
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 class="text-2xl md:text-3xl font-bold text-white mb-2">Trading Dashboard</h1>
+                        <p class="text-slate-400">Monitor and manage your OpenAlgo instances</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <!-- Refresh Status -->
+                        <div class="flex items-center space-x-2 text-slate-400">
+                            <i data-lucide="refresh-cw" class="w-4 h-4 animate-spin" id="refresh-indicator"></i>
+                            <span class="text-sm">Last updated: <span id="last-updated">Never</span></span>
+                        </div>
+                        <!-- Auto refresh toggle -->
+                        <label class="flex items-center space-x-2 text-slate-300">
+                            <input type="checkbox" id="auto-refresh" checked class="rounded">
+                            <span class="text-sm">Auto-refresh (20s)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                    <div class="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i data-lucide="server" class="w-4 h-4 text-blue-400"></i>
+                            <span class="text-slate-400 text-sm">Total Instances</span>
+                        </div>
+                        <div class="text-2xl font-bold text-white" id="total-instances">0</div>
+                    </div>
+                    
+                    <div class="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i data-lucide="activity" class="w-4 h-4 text-green-400"></i>
+                            <span class="text-slate-400 text-sm">Online</span>
+                        </div>
+                        <div class="text-2xl font-bold text-white" id="online-instances">0</div>
+                    </div>
+                    
+                    <div class="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i data-lucide="trending-up" class="w-4 h-4 text-amber-400"></i>
+                            <span class="text-slate-400 text-sm">Live Trading</span>
+                        </div>
+                        <div class="text-2xl font-bold text-white" id="live-trading">0</div>
+                    </div>
+                    
+                    <div class="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i data-lucide="dollar-sign" class="w-4 h-4 text-blue-400"></i>
+                            <span class="text-slate-400 text-sm">Total Cash</span>
+                        </div>
+                        <div class="text-2xl font-bold text-white" id="total-cash">₹0.00</div>
+                    </div>
+                    
+                    <div class="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i data-lucide="trending-up" class="w-4 h-4 text-info"></i>
+                            <span class="text-slate-400 text-sm">Total P&L</span>
+                        </div>
+                        <div class="text-4xl md:text-5xl font-bold" id="total-pnl">₹0.00</div>
+                        <div class="flex items-center space-x-2 mt-2">
+                            <i data-lucide="arrow-up" class="w-4 h-4 text-profit hidden" id="pnl-trend-up"></i>
+                            <i data-lucide="arrow-down" class="w-4 h-4 text-loss hidden" id="pnl-trend-down"></i>
+                            <span class="text-slate-400 text-sm" id="pnl-change">0.00%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 mb-8">
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <!-- Search -->
+                        <div class="flex-1 min-w-64">
+                            <div class="relative">
+                                <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4"></i>
+                                <input type="text" id="search-input" placeholder="Search by name, host URL, or strategy tag..." 
+                                       class="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+                        
+                        <!-- Mode Filter -->
+                        <select id="mode-filter" class="px-4 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white">
+                            <option value="">All Modes</option>
+                            <option value="live">Live Mode</option>
+                            <option value="analyzer">Analyzer Mode</option>
+                        </select>
+
+                        <!-- View Toggle -->
+                        <div class="flex bg-slate-700/50 rounded-lg p-1">
+                            <button id="card-view-btn" class="view-btn active px-4 py-2 rounded-md text-sm font-medium transition-all duration-200">
+                                <i data-lucide="grid-3x3" class="w-4 h-4 mr-2 inline"></i>Cards
+                            </button>
+                            <button id="table-view-btn" class="view-btn px-4 py-2 rounded-md text-sm font-medium transition-all duration-200">
+                                <i data-lucide="table" class="w-4 h-4 mr-2 inline"></i>Table
+                            </button>
+                        </div>
+
+                        <!-- Bulk Actions -->
+                        <div id="bulk-actions" class="hidden flex items-center space-x-2">
+                            <span class="text-slate-400 text-sm"><span id="selected-count">0</span> selected</span>
+                            <button id="bulk-live-btn" class="px-3 py-2 bg-green-500/20 border border-green-500/30 text-green-300 rounded-lg text-sm hover:bg-green-500/30 transition-all duration-200">
+                                Set Live
+                            </button>
+                            <button id="bulk-analyzer-btn" class="px-3 py-2 bg-orange-500/20 border border-orange-500/30 text-orange-300 rounded-lg text-sm hover:bg-orange-500/30 transition-all duration-200">
+                                Set Analyzer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Instances Container -->
+                <div id="instances-container" class="card-view">
+                    <!-- Instances will be loaded here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="empty-state" class="hidden text-center py-16">
+                    <div class="w-16 h-16 bg-slate-700/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="server" class="w-8 h-8 text-slate-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-2">No instances found</h3>
+                    <p class="text-slate-400 mb-6">Get started by adding your first OpenAlgo instance</p>
+                    <button onclick="showView('admin')" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200">
+                        Add Instance
+                    </button>
+                </div>
+            </div>
+
+            <!-- Instances View -->
+            <div id="admin-view" class="hidden p-8">
+                <!-- Header -->
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 class="text-3xl font-bold text-white mb-2">Instance Management</h1>
+                        <p class="text-slate-400">Add, edit, and manage your OpenAlgo instances</p>
+                    </div>
+                    <button onclick="showAddInstanceModal()" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                        <span>Add Instance</span>
+                    </button>
+                </div>
+
+                <!-- Search Bar for Admin -->
+                <div class="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 mb-8">
+                    <div class="relative">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4"></i>
+                        <input type="text" id="admin-search-input" placeholder="Search instances by name, host URL, or strategy tag..." 
+                               class="w-full pl-10 pr-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+
+                <!-- Admin Instances List -->
+                <div id="admin-instances" class="space-y-4">
+                    <!-- Admin instances will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Users View -->
+            <div id="users-view" class="hidden p-8">
+                <!-- Header -->
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 class="text-3xl font-bold text-white">User Management</h1>
+                        <p class="text-slate-400 mt-1">Manage access control for Simplifyed dashboard</p>
+                    </div>
+                </div>
+
+                <!-- Add User Section -->
+                <div class="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 mb-8">
+                    <h2 class="text-xl font-bold text-white mb-4">Add New User</h2>
+                    <div class="flex space-x-4">
+                        <div class="flex-1">
+                            <input 
+                                type="email" 
+                                id="new-user-email" 
+                                placeholder="Enter email address" 
+                                class="w-full px-4 py-3 bg-slate-700/30 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent"
+                            >
+                        </div>
+                        <button 
+                            onclick="addUser()" 
+                            class="px-6 py-3 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all duration-200 font-semibold flex items-center space-x-2"
+                        >
+                            <i data-lucide="user-plus" class="w-4 h-4"></i>
+                            <span>Add User</span>
+                        </button>
+                    </div>
+                    <p class="text-slate-400 text-sm mt-2">Only users with added email addresses can access the application after Google authentication.</p>
+                </div>
+
+                <!-- Users List -->
+                <div class="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden">
+                    <div class="p-6 border-b border-slate-700/50">
+                        <h2 class="text-xl font-bold text-white">Authorized Users</h2>
+                        <p class="text-slate-400 text-sm mt-1">Users who can access the application</p>
+                    </div>
+                    <div id="users-list" class="divide-y divide-slate-700/50">
+                        <!-- Users will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Watchlists View -->
+            <div id="watchlists-view" class="hidden p-8">
+                <!-- Header -->
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 class="text-3xl font-bold text-white mb-2">Watchlist Management</h1>
+                        <p class="text-slate-400">Create and manage symbol watchlists with configurations</p>
+                    </div>
+                    <button onclick="showCreateWatchlistModal()" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                        <span>New Watchlist</span>
+                    </button>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 mb-8">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-1 relative">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4"></i>
+                            <input type="text" id="watchlist-search-input" placeholder="Search watchlists by name or description..."
+                                   class="w-full pl-10 pr-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <button onclick="loadWatchlists()" class="px-4 py-3 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all duration-200">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Watchlists List -->
+                <div id="watchlists-list" class="space-y-4">
+                    <!-- Watchlists will be loaded here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="watchlists-empty-state" class="hidden text-center py-16">
+                    <div class="w-16 h-16 bg-slate-700/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="list" class="w-8 h-8 text-slate-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-2">No watchlists found</h3>
+                    <p class="text-slate-400 mb-6">Create your first watchlist to get started</p>
+                    <button onclick="showCreateWatchlistModal()" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200">
+                        Create Watchlist
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Instance Modal -->
+    <div id="instance-modal" class="modal fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 items-center justify-center">
+        <div class="max-w-2xl w-full bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 id="modal-title" class="text-2xl font-bold text-white">Add New Instance</h2>
+                <button onclick="closeInstanceModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <form id="instance-form" class="space-y-6">
+                <input type="hidden" id="instance-id">
+                
+                <!-- Basic Information -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-white font-medium mb-2">Instance Name *</label>
+                        <input type="text" id="instance-name" required placeholder="e.g., Angel One - Main"
+                               class="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-white font-medium mb-2">Strategy Tag</label>
+                        <input type="text" id="strategy-tag" placeholder="e.g., Momentum, Scalping"
+                               class="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+
+                <!-- Connection Details -->
+                <div>
+                    <label class="block text-white font-medium mb-2">Host URL *</label>
+                    <input type="url" id="host-url" required placeholder="https://your-openalgo-instance.com"
+                           class="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-white font-medium mb-2">API Key *</label>
+                    <div class="relative">
+                        <input type="password" id="api-key" required placeholder="Enter your OpenAlgo API key"
+                               class="w-full px-4 py-3 pr-24 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                        <div class="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+                            <button type="button" id="test-connection-btn" class="px-3 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded text-sm hover:bg-blue-500/30 transition-all duration-200">
+                                Test
+                            </button>
+                        </div>
+                    </div>
+                    <div id="connection-status" class="mt-2 text-sm"></div>
+                </div>
+
+                <!-- Thresholds -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-white font-medium mb-2">Target Profit (₹)</label>
+                        <input type="number" id="target-profit" step="0.01" min="0" placeholder="5000.00"
+                               class="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-white font-medium mb-2">Max Loss (₹)</label>
+                        <input type="number" id="target-loss" step="0.01" min="0" placeholder="2000.00"
+                               class="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+
+                <!-- Admin Instance Assignment -->
+                <div class="border border-slate-600/50 rounded-lg p-4 bg-slate-700/30">
+                    <label class="block text-white font-medium mb-3">Admin Instance Assignment</label>
+                    <div class="space-y-3">
+                        <label class="flex items-center space-x-3 cursor-pointer group">
+                            <input type="checkbox" id="is-primary-admin" class="w-5 h-5 bg-slate-700/50 border-slate-600 rounded text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 focus:ring-offset-slate-800">
+                            <div class="flex-1">
+                                <div class="text-white font-medium group-hover:text-blue-300 transition-colors">Primary Admin Instance</div>
+                                <div class="text-slate-400 text-sm">Used for symbol validation and primary data operations</div>
+                            </div>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer group">
+                            <input type="checkbox" id="is-secondary-admin" class="w-5 h-5 bg-slate-700/50 border-slate-600 rounded text-purple-500 focus:ring-2 focus:ring-purple-500 focus:ring-offset-0 focus:ring-offset-slate-800">
+                            <div class="flex-1">
+                                <div class="text-white font-medium group-hover:text-purple-300 transition-colors">Secondary Admin Instance</div>
+                                <div class="text-slate-400 text-sm">Fallback for symbol validation if primary is unavailable</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="flex justify-end space-x-4 pt-6">
+                    <button type="button" onclick="closeInstanceModal()" class="px-6 py-3 text-slate-300 hover:text-white border border-slate-600 hover:border-slate-500 rounded-lg transition-all duration-200">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submit-btn" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200">
+                        Add Instance
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[60] items-center justify-center">
+        <div class="max-w-md w-full bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 shadow-2xl mx-4">
+            <h3 class="text-lg font-semibold text-white mb-4" id="confirm-title">Confirm Action</h3>
+            <p class="text-slate-300 mb-6" id="confirm-message">Are you sure?</p>
+            <div class="flex justify-end space-x-4">
+                <button onclick="closeConfirmModal()" class="px-4 py-2 text-slate-300 hover:text-white border border-slate-600 hover:border-slate-500 rounded-lg transition-all duration-200">
+                    Cancel
+                </button>
+                <button id="confirm-yes-btn" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200">
+                    Yes, Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Watchlist Modal -->
+    <div id="watchlist-modal" class="modal fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 items-center justify-center">
+        <div class="max-w-2xl w-full bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h2 id="watchlist-modal-title" class="text-2xl font-bold text-white">Create Watchlist</h2>
+                <button onclick="closeWatchlistModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <form id="watchlist-form" class="space-y-6">
+                <input type="hidden" id="watchlist-id">
+
+                <!-- Basic Information -->
+                <div>
+                    <label class="block text-white font-medium mb-2">Watchlist Name *</label>
+                    <input type="text" id="watchlist-name" required placeholder="e.g., Nifty 50 Stocks"
+                           class="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-white font-medium mb-2">Description</label>
+                    <textarea id="watchlist-description" rows="3" placeholder="Optional description for this watchlist"
+                              class="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"></textarea>
+                </div>
+
+                <div>
+                    <label class="flex items-center space-x-3">
+                        <input type="checkbox" id="watchlist-active" checked class="w-5 h-5 rounded border-slate-600 bg-slate-700/50 text-blue-500 focus:ring-2 focus:ring-blue-500">
+                        <span class="text-white font-medium">Active</span>
+                    </label>
+                </div>
+
+                <!-- Instance Assignment -->
+                <div class="border-t border-slate-700 pt-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-white">Assign Instances</h3>
+                            <p class="text-slate-400 text-sm">Select trading instances for this watchlist</p>
+                        </div>
+                        <button type="button" onclick="toggleAllWatchlistInstances()" class="text-sm text-blue-400 hover:text-blue-300">
+                            Select All
+                        </button>
+                    </div>
+
+                    <div id="watchlist-instances-selection" class="space-y-2 max-h-64 overflow-y-auto bg-slate-700/30 rounded-lg p-4">
+                        <!-- Instances checkboxes will be loaded here dynamically -->
+                        <div class="text-slate-400 text-sm">Loading instances...</div>
+                    </div>
+                    <p class="text-slate-400 text-xs mt-2">💡 Assign instances during creation - you can change this later</p>
+                </div>
+
+                <div class="flex justify-end space-x-4 pt-6">
+                    <button type="button" onclick="closeWatchlistModal()" class="px-6 py-3 text-slate-300 hover:text-white border border-slate-600 hover:border-slate-500 rounded-lg transition-all duration-200">
+                        Cancel
+                    </button>
+                    <button type="submit" id="watchlist-submit-btn" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200">
+                        Create Watchlist
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Watchlist Detail Modal -->
+    <div id="watchlist-detail-modal" class="modal fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 items-center justify-center overflow-y-auto">
+        <div class="max-w-6xl w-full bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl mx-4 my-8 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 id="watchlist-detail-name" class="text-2xl font-bold text-white mb-1">Watchlist Details</h2>
+                    <p id="watchlist-detail-description" class="text-slate-400"></p>
+                </div>
+                <button onclick="closeWatchlistDetailModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="flex space-x-1 mb-6 bg-slate-700/30 p-1 rounded-lg">
+                <button onclick="showWatchlistTab('symbols')" id="tab-symbols" class="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-500/20 border border-blue-500/30 rounded-md transition-all duration-200">
+                    <i data-lucide="list" class="w-4 h-4 mr-2 inline"></i>Symbols
+                </button>
+                <button onclick="showWatchlistTab('instances')" id="tab-instances" class="flex-1 px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/30 rounded-md transition-all duration-200">
+                    <i data-lucide="server" class="w-4 h-4 mr-2 inline"></i>Instances
+                </button>
+                <button onclick="showWatchlistTab('import')" id="tab-import" class="flex-1 px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/30 rounded-md transition-all duration-200">
+                    <i data-lucide="upload" class="w-4 h-4 mr-2 inline"></i>Import/Export
+                </button>
+            </div>
+
+            <!-- Symbols Tab -->
+            <div id="watchlist-symbols-tab" class="watchlist-tab">
+                <div class="mb-4 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-white">Symbols (<span id="watchlist-symbols-count">0</span>)</h3>
+                    <div class="flex space-x-2">
+                        <button onclick="showPlaceOrdersModal()" class="px-4 py-2 bg-green-500/20 border border-green-500/30 text-green-300 rounded-lg text-sm hover:bg-green-500/30 transition-all duration-200 flex items-center space-x-2">
+                            <i data-lucide="trending-up" class="w-4 h-4"></i>
+                            <span>Place Orders</span>
+                        </button>
+                        <button onclick="showAddSymbolForm()" class="px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded-lg text-sm hover:bg-blue-500/30 transition-all duration-200">
+                            <i data-lucide="plus" class="w-4 h-4 mr-2 inline"></i>Add Symbol
+                        </button>
+                    </div>
+                </div>
+                <div id="watchlist-symbols-list" class="bg-slate-700/30 rounded-lg overflow-hidden">
+                    <!-- Symbols will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Instances Tab -->
+            <div id="watchlist-instances-tab" class="watchlist-tab hidden">
+                <div class="mb-4 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-white">Assigned Instances (<span id="watchlist-instances-count">0</span>)</h3>
+                    <button onclick="showAssignInstancesForm()" class="px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded-lg text-sm hover:bg-blue-500/30 transition-all duration-200">
+                        <i data-lucide="plus" class="w-4 h-4 mr-2 inline"></i>Assign Instances
+                    </button>
+                </div>
+                <div id="watchlist-instances-list" class="space-y-2">
+                    <!-- Instances will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Import/Export Tab -->
+            <div id="watchlist-import-tab" class="watchlist-tab hidden">
+                <div class="space-y-6">
+                    <!-- Export Section -->
+                    <div class="bg-slate-700/30 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-white mb-4">Export Symbols</h3>
+                        <p class="text-slate-400 mb-4">Download all symbols and configurations as CSV file</p>
+                        <button onclick="exportWatchlistCsv()" class="px-6 py-3 bg-green-500/20 border border-green-500/30 text-green-300 rounded-lg hover:bg-green-500/30 transition-all duration-200">
+                            <i data-lucide="download" class="w-4 h-4 mr-2 inline"></i>Export CSV
+                        </button>
+                    </div>
+
+                    <!-- Import Section -->
+                    <div class="bg-slate-700/30 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-white mb-4">Import Symbols</h3>
+                        <p class="text-slate-400 mb-4">Upload CSV file with symbols and configurations</p>
+
+                        <div class="mb-4">
+                            <label class="block text-white font-medium mb-2">Import Mode</label>
+                            <div class="flex space-x-4">
+                                <label class="flex items-center space-x-2">
+                                    <input type="radio" name="import-mode" value="append" checked class="text-blue-500">
+                                    <span class="text-slate-300">Append (add new symbols)</span>
+                                </label>
+                                <label class="flex items-center space-x-2">
+                                    <input type="radio" name="import-mode" value="replace" class="text-blue-500">
+                                    <span class="text-slate-300">Replace (remove existing)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <input type="file" id="csv-file-input" accept=".csv,text/csv" class="block w-full text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-500/20 file:text-blue-300 hover:file:bg-blue-500/30">
+                        </div>
+
+                        <button onclick="importWatchlistCsv()" class="px-6 py-3 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all duration-200">
+                            <i data-lucide="upload" class="w-4 h-4 mr-2 inline"></i>Import CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assign Instances Modal -->
+    <div id="assign-instances-modal" class="modal fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[60] items-center justify-center">
+        <div class="max-w-2xl w-full bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-white">Assign Instances</h2>
+                <button onclick="closeAssignInstancesModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div class="mb-4">
+                <p class="text-slate-400">Select instances to assign to this watchlist:</p>
+            </div>
+
+            <div id="assign-instances-list" class="space-y-2 mb-6 max-h-96 overflow-y-auto">
+                <!-- Instances checkboxes will be loaded here -->
+            </div>
+
+            <div class="flex justify-end space-x-4">
+                <button onclick="closeAssignInstancesModal()" class="px-6 py-3 text-slate-300 hover:text-white border border-slate-600 hover:border-slate-500 rounded-lg transition-all duration-200">
+                    Cancel
+                </button>
+                <button onclick="saveAssignedInstances()" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200">
+                    Save Assignments
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Symbol Modal -->
+    <div id="add-symbol-modal" class="modal fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[60] items-center justify-center overflow-y-auto">
+        <div class="max-w-4xl w-full bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl mx-4 my-8 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-white">Add Symbol</h2>
+                <button onclick="closeAddSymbolModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <form id="add-symbol-form" onsubmit="submitAddSymbol(event)" class="space-y-6">
+                <!-- Dynamic Symbol Search -->
+                <div class="bg-gradient-to-r from-blue-900/20 to-purple-900/20 rounded-lg p-6 border border-blue-500/30">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="search" class="w-5 h-5 mr-2 text-blue-400"></i>
+                        Dynamic Symbol Search
+                    </h3>
+                    <div class="space-y-4">
+                        <!-- Search Input -->
+                        <div>
+                            <label class="block text-white font-medium mb-2">Search Symbols *</label>
+                            <div class="relative">
+                                <input type="text" id="add-symbol-search" placeholder="Type symbol name (e.g., RELIANCE, NIFTY, BANKNIFTY)" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500" oninput="debounceSymbolSearch()">
+                                <div id="search-spinner" class="absolute right-3 top-1/2 -translate-y-1/2 hidden">
+                                    <i data-lucide="loader-2" class="w-5 h-5 text-blue-400 animate-spin"></i>
+                                </div>
+                            </div>
+                            <p class="text-slate-400 text-sm mt-1">Search results appear below. Select a symbol to auto-fill the form.</p>
+                        </div>
+
+                        <!-- Search Results -->
+                        <div id="search-results" class="max-h-60 overflow-y-auto bg-slate-800/50 rounded-lg border border-slate-600 hidden">
+                            <!-- Search results will be populated here -->
+                        </div>
+
+                        <!-- Multiple Exchange/Type Selection -->
+                        <div id="symbol-type-selector" class="hidden">
+                            <label class="block text-white font-medium mb-2">Select Exchange & Type</label>
+                            <div id="symbol-type-options" class="space-y-2">
+                                <!-- Options will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Basic Information -->
+                <div class="bg-slate-700/20 rounded-lg p-6 border border-slate-600/30">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="info" class="w-5 h-5 mr-2 text-blue-400"></i>
+                        Basic Information
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Symbol *</label>
+                            <input type="text" id="add-symbol-name" required placeholder="e.g., RELIANCE" onblur="validateAndFetchLotSize()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-white font-medium mb-2">Exchange *</label>
+                            <select id="add-symbol-exchange" required onchange="validateAndFetchLotSize()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="">Select Exchange</option>
+                                <option value="NSE">NSE</option>
+                                <option value="BSE">BSE</option>
+                                <option value="NSE_INDEX">NSE_INDEX (Indices - NIFTY, BANKNIFTY)</option>
+                                <option value="NFO">NFO (Futures & Options)</option>
+                                <option value="BFO">BFO</option>
+                                <option value="MCX">MCX</option>
+                                <option value="CDS">CDS</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-white font-medium">Lot Size</label>
+                            <span id="add-symbol-validation-status" class="text-xs text-slate-400"></span>
+                        </div>
+                        <input type="number" id="add-symbol-lot-size" min="1" step="1" value="1" readonly class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-300 cursor-not-allowed">
+                        <p class="text-slate-400 text-sm mt-1">
+                            Automatically fetched from exchange data
+                            <span class="block text-xs text-yellow-400 mt-1" id="lot-size-note">
+                                For NFO/MCX: Quantity must be in multiples of lot size
+                            </span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Product & Order Type -->
+                <div class="bg-slate-700/20 rounded-lg p-6 border border-slate-600/30">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="settings" class="w-5 h-5 mr-2 text-purple-400"></i>
+                        Product & Order Type
+                    </h3>
+
+                    <!-- Trading Capability Checkboxes -->
+                    <div class="mb-6">
+                        <label class="block text-white font-medium mb-3">Available Trading Types *</label>
+                        <p class="text-slate-400 text-sm mb-3">Automatically detected from OpenAlgo symbol data</p>
+                        <div class="flex flex-wrap gap-3">
+                            <label class="relative flex items-center">
+                                <input type="checkbox" id="trade-type-equity" class="sr-only" readonly>
+                                <span class="px-4 py-2 border-2 border-slate-600 rounded-lg cursor-default bg-slate-800/30 text-green-300">
+                                    <i data-lucide="trending-up" class="w-4 h-4 mr-1 inline"></i>Equity
+                                </span>
+                            </label>
+                            <label class="relative flex items-center">
+                                <input type="checkbox" id="trade-type-futures" class="sr-only" readonly>
+                                <span class="px-4 py-2 border-2 border-slate-600 rounded-lg cursor-default bg-slate-800/30 text-purple-300">
+                                    <i data-lucide="arrow-up-right" class="w-4 h-4 mr-1 inline"></i>Futures
+                                </span>
+                            </label>
+                            <label class="relative flex items-center">
+                                <input type="checkbox" id="trade-type-options" class="sr-only" readonly>
+                                <span class="px-4 py-2 border-2 border-slate-600 rounded-lg cursor-default bg-slate-800/30 text-amber-300">
+                                    <i data-lucide="grid-3x3" class="w-4 h-4 mr-1 inline"></i>Options
+                                </span>
+                            </label>
+                        </div>
+                        <p class="text-slate-400 text-xs mt-2">
+                            <i data-lucide="info" class="w-3 h-3 inline mr-1"></i>
+                            Auto-detected from OpenAlgo API based on instrument type, expiry, and strike price.
+                        </p>
+                    </div>
+
+                    <!-- Options Configuration (shown when Options is available) -->
+                    <div id="options-config-section" class="hidden mb-6">
+                        <div class="bg-gradient-to-r from-amber-900/20 to-orange-900/20 rounded-lg p-4 border border-amber-500/30">
+                            <h4 class="text-white font-semibold mb-3 flex items-center">
+                                <i data-lucide="cog" class="w-4 h-4 mr-2 text-amber-400"></i>
+                                Options Configuration
+                            </h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-white font-medium mb-2">Relative Strike Selection</label>
+                                    <select id="options-strike-offset" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                        <option value="ITM3">ITM3 (Deep In The Money)</option>
+                                        <option value="ITM2">ITM2 (In The Money)</option>
+                                        <option value="ITM1">ITM1 (Slightly In The Money)</option>
+                                        <option value="ATM" selected>ATM (At The Money)</option>
+                                        <option value="OTM1">OTM1 (Slightly Out of The Money)</option>
+                                        <option value="OTM2">OTM2 (Out of The Money)</option>
+                                        <option value="OTM3">OTM3 (Deep Out of The Money)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-white font-medium mb-2">Expiry</label>
+                                    <div class="relative">
+                                        <input type="text" id="options-expiry" value="Auto (Nearest)" readonly class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-300 cursor-not-allowed">
+                                        <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                                            <i data-lucide="calendar" class="w-4 h-4 text-amber-400"></i>
+                                        </div>
+                                    </div>
+                                    <p class="text-slate-400 text-xs mt-1">Auto-refreshes every Wednesday & Friday at 8:00 AM</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Product Type</label>
+                            <select id="add-symbol-product" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="MIS">MIS (Intraday)</option>
+                                <option value="CNC">CNC (Delivery)</option>
+                                <option value="NRML">NRML (Normal)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-white font-medium mb-2">Order Type</label>
+                            <select id="add-symbol-ordertype" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="MARKET">MARKET</option>
+                                <option value="LIMIT">LIMIT</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Per-Type Quantity Configuration -->
+                <div id="quantity-config-section" class="bg-slate-700/20 rounded-lg p-6 border border-slate-600/30">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="hash" class="w-5 h-5 mr-2 text-blue-400"></i>
+                        Quantity Configuration by Trading Type
+                    </h3>
+                    <p class="text-slate-400 text-sm mb-6">Configure quantity settings for each trading type. These settings will be used when trading in the respective mode.</p>
+
+                    <!-- Equity Quantity Settings -->
+                    <div id="equity-qty-config" class="mb-6">
+                        <div class="flex items-center mb-3">
+                            <i data-lucide="trending-up" class="w-4 h-4 mr-2 text-green-400"></i>
+                            <h4 class="text-white font-semibold">Equity Trading</h4>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                            <div>
+                                <label class="block text-white font-medium mb-2">Quantity Mode</label>
+                                <select id="equity-qty-mode" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                    <option value="fixed">Fixed</option>
+                                    <option value="capital">Capital</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-white font-medium mb-2">Quantity Value</label>
+                                <input type="number" id="equity-qty-value" min="1" value="100" step="1" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <p class="text-slate-400 text-xs mt-1">Shares or capital amount</p>
+                            </div>
+                            <div>
+                                <label class="block text-white font-medium mb-2">Quantity Units</label>
+                                <select id="equity-qty-units" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                    <option value="units">Units (Shares)</option>
+                                    <option value="lots">Lots</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-white font-medium mb-2">Min Qty</label>
+                                <input type="number" id="equity-min-qty" min="1" value="1" step="1" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Futures Quantity Settings -->
+                    <div id="futures-qty-config" class="mb-6">
+                        <div class="flex items-center mb-3">
+                            <i data-lucide="arrow-up-right" class="w-4 h-4 mr-2 text-purple-400"></i>
+                            <h4 class="text-white font-semibold">Futures Trading</h4>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                            <div>
+                                <label class="block text-white font-medium mb-2">Quantity Mode</label>
+                                <select id="futures-qty-mode" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                    <option value="fixed">Fixed</option>
+                                    <option value="capital">Capital</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-white font-medium mb-2">Quantity Value</label>
+                                <input type="number" id="futures-qty-value" min="1" value="1" step="1" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <p class="text-slate-400 text-xs mt-1">Lots or capital amount</p>
+                            </div>
+                            <div>
+                                <label class="block text-white font-medium mb-2">Quantity Units</label>
+                                <select id="futures-qty-units" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                    <option value="units">Units</option>
+                                    <option value="lots">Lots</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-white font-medium mb-2">Min Qty</label>
+                                <input type="number" id="futures-min-qty" min="1" value="1" step="1" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Options Quantity Settings -->
+                    <div id="options-qty-config" class="mb-6">
+                        <div class="flex items-center mb-3">
+                            <i data-lucide="grid-3x3" class="w-4 h-4 mr-2 text-amber-400"></i>
+                            <h4 class="text-white font-semibold">Options Trading</h4>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                            <div>
+                                <label class="block text-white font-medium mb-2">Quantity Mode</label>
+                                <select id="options-qty-mode" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                    <option value="fixed">Fixed</option>
+                                    <option value="capital">Capital</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-white font-medium mb-2">Quantity Value</label>
+                                <input type="number" id="options-qty-value" min="1" value="1" step="1" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <p class="text-slate-400 text-xs mt-1">Lots or capital amount</p>
+                            </div>
+                            <div>
+                                <label class="block text-white font-medium mb-2">Quantity Units</label>
+                                <select id="options-qty-units" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                    <option value="units">Units</option>
+                                    <option value="lots">Lots</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-white font-medium mb-2">Min Qty</label>
+                                <input type="number" id="options-min-qty" min="1" value="1" step="1" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legacy Quantity Settings (V2) - Hidden by default -->
+                <div id="legacy-qty-config" class="hidden bg-slate-700/20 rounded-lg p-6 border border-slate-600/30">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="hash" class="w-5 h-5 mr-2 text-blue-400"></i>
+                        Quantity Settings (V2)
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Quantity Mode</label>
+                            <select id="add-symbol-qtytype" onchange="updateAddSymbolQtyModeFields()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="fixed">Fixed</option>
+                                <option value="capital">Capital</option>
+                                <option value="funds_percent">Funds Percent</option>
+                            </select>
+                            <p class="text-slate-400 text-xs mt-1">How to calculate quantity per order</p>
+                        </div>
+                        <div id="add-symbol-qty-units-group">
+                            <label class="block text-white font-medium mb-2">Quantity Units</label>
+                            <select id="add-symbol-qty-units" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="units">Units</option>
+                                <option value="lots">Lots</option>
+                            </select>
+                            <p class="text-slate-400 text-xs mt-1">Only for Fixed mode</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div id="add-symbol-qty-value-group">
+                            <label class="block text-white font-medium mb-2">Quantity Value</label>
+                            <input type="number" id="add-symbol-qty" min="1" value="1" step="0.01" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1" id="add-symbol-qty-help">Units/lots, capital amount, or %</p>
+                        </div>
+                        <div id="add-symbol-min-qty-group">
+                            <label class="block text-white font-medium mb-2">Min Qty Per Click</label>
+                            <input type="number" id="add-symbol-min-qty" min="1" step="1" value="1" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Minimum order size</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div id="add-symbol-max-qty-group">
+                            <label class="block text-white font-medium mb-2">Max Qty Per Click</label>
+                            <input type="number" id="add-symbol-max-qty" min="1" step="1" placeholder="Optional" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Maximum order size per click</p>
+                        </div>
+                        <div>
+                            <label class="block text-white font-medium mb-2">Capital Ceiling Per Trade</label>
+                            <input type="number" id="add-symbol-capital-ceiling" min="0" step="0.01" placeholder="Optional" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Maximum capital per order (for capital/funds modes)</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Contract Multiplier</label>
+                            <input type="number" id="add-symbol-contract-multiplier" min="0.01" step="0.01" value="1.0" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Multiplier for derivatives (default 1.0)</p>
+                        </div>
+                        <div>
+                            <label class="block text-white font-medium mb-2">Rounding</label>
+                            <select id="add-symbol-rounding" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="floor_to_lot">Floor to Lot</option>
+                                <option value="none">No Rounding</option>
+                            </select>
+                            <p class="text-slate-400 text-xs mt-1">How to round calculated quantity</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Target Settings -->
+                <div class="bg-slate-700/20 rounded-lg p-6 border border-slate-600/30">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="target" class="w-5 h-5 mr-2 text-green-400"></i>
+                        Target Settings
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Target Type</label>
+                            <select id="add-symbol-target-type" onchange="updateAddSymbolTargetFields()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="NONE">None</option>
+                                <option value="POINTS">Points</option>
+                                <option value="PERCENTAGE">Percentage</option>
+                            </select>
+                        </div>
+                        <div id="add-symbol-target-value-group">
+                            <label class="block text-white font-medium mb-2">Target Value</label>
+                            <input type="number" id="add-symbol-target-value" min="0" step="0.01" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Points or Percentage</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stop Loss Settings -->
+                <div class="bg-slate-700/20 rounded-lg p-6 border border-slate-600/30">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="shield" class="w-5 h-5 mr-2 text-red-400"></i>
+                        Stop Loss Settings
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Stop Loss Type</label>
+                            <select id="add-symbol-sl-type" onchange="updateAddSymbolSLFields()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="NONE">None</option>
+                                <option value="POINTS">Points</option>
+                                <option value="PERCENTAGE">Percentage</option>
+                            </select>
+                        </div>
+                        <div id="add-symbol-sl-value-group">
+                            <label class="block text-white font-medium mb-2">Stop Loss Value</label>
+                            <input type="number" id="add-symbol-sl-value" min="0" step="0.01" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Points or Percentage</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trailing Stop Loss -->
+                <div class="bg-slate-700/20 rounded-lg p-6 border border-slate-600/30">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="trending-up" class="w-5 h-5 mr-2 text-yellow-400"></i>
+                        Trailing Stop Loss
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Trailing Type</label>
+                            <select id="add-symbol-ts-type" onchange="updateAddSymbolTSFields()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="NONE">None</option>
+                                <option value="POINTS">Points</option>
+                                <option value="PERCENTAGE">Percentage</option>
+                            </select>
+                        </div>
+                        <div id="add-symbol-ts-value-group">
+                            <label class="block text-white font-medium mb-2">Trailing Value</label>
+                            <input type="number" id="add-symbol-ts-value" min="0" step="0.01" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Points or Percentage</p>
+                        </div>
+                    </div>
+                    <div id="add-symbol-trailing-activation-group" class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Activation Type</label>
+                            <select id="add-symbol-trailing-activation-type" onchange="updateAddSymbolTrailingActivationFields()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="IMMEDIATE">Immediate</option>
+                                <option value="POINTS">Points</option>
+                                <option value="PERCENTAGE">Percentage</option>
+                            </select>
+                        </div>
+                        <div id="add-symbol-trailing-activation-value-group">
+                            <label class="block text-white font-medium mb-2">Activation Value</label>
+                            <input type="number" id="add-symbol-trailing-activation-value" min="0" step="0.01" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Points or Percentage</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advanced Settings -->
+                <div class="bg-slate-700/20 rounded-lg p-6 border border-slate-600/30">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="sliders" class="w-5 h-5 mr-2 text-indigo-400"></i>
+                        Advanced Settings
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Max Position Size</label>
+                            <input type="number" id="add-symbol-max-position-size" min="0" step="1" placeholder="Optional" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Maximum position size limit</p>
+                        </div>
+                        <div>
+                            <label class="block text-white font-medium mb-2">Max Instances</label>
+                            <input type="number" id="add-symbol-max-instances" min="0" step="1" placeholder="Optional" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Max instances that can trade this</p>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="flex items-center space-x-3">
+                            <input type="checkbox" id="add-symbol-is-enabled" checked class="w-5 h-5 rounded border-slate-600 bg-slate-700/50 text-blue-500 focus:ring-2 focus:ring-blue-500">
+                            <div>
+                                <span class="text-white font-medium">Symbol Enabled</span>
+                                <p class="text-slate-400 text-xs">Allow trading for this symbol</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-end space-x-4 pt-6 border-t border-slate-700">
+                    <button type="button" onclick="closeAddSymbolModal()" class="px-6 py-3 text-slate-300 hover:text-white border border-slate-600 hover:border-slate-500 rounded-lg transition-all duration-200">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>Add Symbol</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Place Orders Modal -->
+    <div id="place-orders-modal" class="modal fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[60] items-center justify-center overflow-y-auto">
+        <div class="max-w-4xl w-full bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl mx-4 my-8 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-white">Place Orders</h2>
+                <button onclick="closePlaceOrdersModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Order Configuration Form -->
+            <div id="place-orders-form" class="space-y-6">
+                <!-- Action Selection -->
+                <div>
+                    <label class="block text-white font-medium mb-3">Action</label>
+                    <div class="grid grid-cols-4 gap-3">
+                        <label class="relative flex items-center justify-center p-4 border-2 border-slate-600 rounded-lg cursor-pointer hover:border-green-500 transition-all duration-200 has-[:checked]:border-green-500 has-[:checked]:bg-green-500/10">
+                            <input type="radio" name="order-action" value="BUY" checked class="sr-only">
+                            <span class="text-green-300 font-medium">BUY</span>
+                        </label>
+                        <label class="relative flex items-center justify-center p-4 border-2 border-slate-600 rounded-lg cursor-pointer hover:border-red-500 transition-all duration-200 has-[:checked]:border-red-500 has-[:checked]:bg-red-500/10">
+                            <input type="radio" name="order-action" value="SELL" class="sr-only">
+                            <span class="text-red-300 font-medium">SELL</span>
+                        </label>
+                        <label class="relative flex items-center justify-center p-4 border-2 border-slate-600 rounded-lg cursor-pointer hover:border-yellow-500 transition-all duration-200 has-[:checked]:border-yellow-500 has-[:checked]:bg-yellow-500/10">
+                            <input type="radio" name="order-action" value="SHORT" class="sr-only">
+                            <span class="text-yellow-300 font-medium">SHORT</span>
+                        </label>
+                        <label class="relative flex items-center justify-center p-4 border-2 border-slate-600 rounded-lg cursor-pointer hover:border-blue-500 transition-all duration-200 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-500/10">
+                            <input type="radio" name="order-action" value="COVER" class="sr-only">
+                            <span class="text-blue-300 font-medium">COVER</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Symbol Selection -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="block text-white font-medium">Symbols</label>
+                        <label class="flex items-center space-x-2 text-sm">
+                            <input type="checkbox" id="select-all-symbols" onchange="toggleAllSymbols()" class="rounded text-blue-500">
+                            <span class="text-slate-300">Select All</span>
+                        </label>
+                    </div>
+                    <div id="order-symbols-list" class="space-y-2 max-h-64 overflow-y-auto bg-slate-700/30 rounded-lg p-4">
+                        <!-- Symbol checkboxes will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Instance Selection -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="block text-white font-medium">Instances</label>
+                        <label class="flex items-center space-x-2 text-sm">
+                            <input type="checkbox" id="select-all-instances" onchange="toggleAllInstances()" class="rounded text-blue-500">
+                            <span class="text-slate-300">Select All</span>
+                        </label>
+                    </div>
+                    <div id="order-instances-list" class="space-y-2 max-h-48 overflow-y-auto bg-slate-700/30 rounded-lg p-4">
+                        <!-- Instance checkboxes will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Order Type and Product -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-white font-medium mb-2">Product Type</label>
+                        <select id="order-product-type" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <option value="">Use Symbol Config</option>
+                            <option value="MIS">MIS (Intraday)</option>
+                            <option value="CNC">CNC (Delivery)</option>
+                            <option value="NRML">NRML (Normal)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-white font-medium mb-2">Order Type</label>
+                        <select id="order-type" onchange="togglePriceInput()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <option value="">Use Symbol Config</option>
+                            <option value="MARKET">MARKET</option>
+                            <option value="LIMIT">LIMIT</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Price Input (for LIMIT orders) -->
+                <div id="order-price-container" class="hidden">
+                    <label class="block text-white font-medium mb-2">Limit Price</label>
+                    <input type="number" id="order-price" step="0.01" min="0" placeholder="Enter limit price" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                    <p class="text-slate-400 text-sm mt-1">Required for LIMIT orders</p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-end space-x-4 pt-4 border-t border-slate-700">
+                    <button onclick="closePlaceOrdersModal()" class="px-6 py-3 text-slate-300 hover:text-white border border-slate-600 hover:border-slate-500 rounded-lg transition-all duration-200">
+                        Cancel
+                    </button>
+                    <button onclick="submitPlaceOrders()" class="px-6 py-3 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2">
+                        <i data-lucide="trending-up" class="w-4 h-4"></i>
+                        <span>Place Orders</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Progress Display (hidden initially) -->
+            <div id="place-orders-progress" class="hidden">
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white font-medium">Placing Orders...</span>
+                        <span id="progress-percentage" class="text-slate-300">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-700 rounded-full h-2">
+                        <div id="progress-bar" class="bg-gradient-to-r from-green-500 to-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div id="progress-status" class="space-y-2 max-h-96 overflow-y-auto bg-slate-700/30 rounded-lg p-4">
+                    <!-- Progress messages will be added here -->
+                </div>
+
+                <div class="flex justify-end pt-4">
+                    <button onclick="closePlaceOrdersModal()" disabled id="progress-close-btn" class="px-6 py-3 text-slate-300 border border-slate-600 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Close
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Display (hidden initially) -->
+            <div id="place-orders-results" class="hidden">
+                <div class="mb-6 p-4 bg-slate-700/30 rounded-lg">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-semibold text-white">Order Placement Complete</h3>
+                        <div class="flex space-x-4 text-sm">
+                            <span class="text-green-300"><i data-lucide="check-circle" class="w-4 h-4 inline mr-1"></i><span id="results-success-count">0</span> Successful</span>
+                            <span class="text-red-300"><i data-lucide="x-circle" class="w-4 h-4 inline mr-1"></i><span id="results-failed-count">0</span> Failed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Table -->
+                <div class="bg-slate-700/30 rounded-lg overflow-hidden mb-6">
+                    <table class="w-full">
+                        <thead class="bg-slate-700/50">
+                            <tr class="text-left text-sm">
+                                <th class="p-3 text-slate-300 font-medium">Symbol</th>
+                                <th class="p-3 text-slate-300 font-medium">Instance</th>
+                                <th class="p-3 text-slate-300 font-medium">Status</th>
+                                <th class="p-3 text-slate-300 font-medium">Order ID</th>
+                                <th class="p-3 text-slate-300 font-medium">Qty</th>
+                                <th class="p-3 text-slate-300 font-medium">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-table-body" class="divide-y divide-slate-700/50">
+                            <!-- Results will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex justify-end">
+                    <button onclick="closePlaceOrdersModal()" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clone Watchlist Modal -->
+    <div id="clone-watchlist-modal" class="modal fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[60] items-center justify-center">
+        <div class="max-w-lg w-full bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-white">Clone Watchlist</h2>
+                <button onclick="closeCloneWatchlistModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <form id="clone-watchlist-form" onsubmit="submitCloneWatchlist(event)" class="space-y-6">
+                <div>
+                    <label class="block text-white font-medium mb-2">Original Watchlist</label>
+                    <input type="text" id="clone-original-name" readonly class="w-full bg-slate-700/30 border border-slate-600 rounded-lg px-4 py-3 text-slate-400 cursor-not-allowed">
+                </div>
+
+                <div>
+                    <label class="block text-white font-medium mb-2">New Watchlist Name *</label>
+                    <input type="text" id="clone-new-name" required placeholder="Enter new watchlist name" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                    <p class="text-slate-400 text-sm mt-1">The new watchlist will include all symbols and configurations</p>
+                </div>
+
+                <div class="flex justify-end space-x-4 pt-4 border-t border-slate-700">
+                    <button type="button" onclick="closeCloneWatchlistModal()" class="px-6 py-3 text-slate-300 hover:text-white border border-slate-600 hover:border-slate-500 rounded-lg transition-all duration-200">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2">
+                        <i data-lucide="copy" class="w-4 h-4"></i>
+                        <span>Clone Watchlist</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Symbol Config Modal -->
+    <div id="edit-symbol-config-modal" class="modal fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[60] items-center justify-center overflow-y-auto">
+        <div class="max-w-3xl w-full bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl mx-4 my-8 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-1">Edit Symbol Configuration</h2>
+                    <p id="edit-symbol-name" class="text-slate-400"></p>
+                </div>
+                <button onclick="closeEditSymbolConfigModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <form id="edit-symbol-config-form" onsubmit="event.preventDefault(); saveSymbolConfig();" class="space-y-6">
+                <!-- Quantity Settings (V2) -->
+                <div class="border border-slate-700/50 rounded-lg p-6 bg-slate-700/20">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="hash" class="w-5 h-5 mr-2 text-blue-400"></i>
+                        Quantity Settings (V2)
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Quantity Mode</label>
+                            <select id="edit-qty-mode" onchange="updateEditQtyModeFields()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="fixed">Fixed</option>
+                                <option value="capital">Capital</option>
+                                <option value="funds_percent">Funds Percent</option>
+                            </select>
+                            <p class="text-slate-400 text-xs mt-1">How to calculate quantity per order</p>
+                        </div>
+                        <div id="edit-qty-units-group">
+                            <label class="block text-white font-medium mb-2">Quantity Units</label>
+                            <select id="edit-qty-units" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="units">Units</option>
+                                <option value="lots">Lots</option>
+                            </select>
+                            <p class="text-slate-400 text-xs mt-1">Only for Fixed mode</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div id="edit-qty-value-group">
+                            <label class="block text-white font-medium mb-2">Quantity Value</label>
+                            <input type="number" id="edit-qty-value" min="1" step="0.01" required class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1" id="edit-qty-value-help">Units/lots, capital amount, or %</p>
+                        </div>
+                        <div id="edit-lot-size-group">
+                            <label class="block text-white font-medium mb-2">Lot Size</label>
+                            <input type="number" id="edit-lot-size" min="1" step="1" value="1" readonly class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-300 cursor-not-allowed">
+                            <p class="text-slate-400 text-xs mt-1">
+                                Units per lot (auto-fetched from search API)
+                                <span class="block text-xs text-yellow-400 mt-1" id="edit-lot-size-note">
+                                    For NFO/MCX: Quantity must be in multiples of lot size
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div id="edit-min-qty-group">
+                            <label class="block text-white font-medium mb-2">Min Qty Per Click</label>
+                            <input type="number" id="edit-min-qty" min="1" step="1" value="1" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Minimum order size</p>
+                        </div>
+                        <div id="edit-max-qty-group">
+                            <label class="block text-white font-medium mb-2">Max Qty Per Click</label>
+                            <input type="number" id="edit-max-qty" min="1" step="1" placeholder="Optional" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Maximum order size per click</p>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-white font-medium mb-2">Capital Ceiling Per Trade</label>
+                        <input type="number" id="edit-capital-ceiling" min="0" step="0.01" placeholder="Optional" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                        <p class="text-slate-400 text-xs mt-1">Maximum capital per order (for capital/funds modes)</p>
+                    </div>
+                </div>
+
+                <!-- F&O Configuration -->
+                <div class="border border-slate-700/50 rounded-lg p-6 bg-slate-700/20">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="grid-3x3" class="w-5 h-5 mr-2 text-purple-400"></i>
+                        F&O Trading Configuration
+                    </h3>
+
+                    <!-- Trading Capability Checkboxes -->
+                    <div class="mb-6">
+                        <label class="block text-white font-medium mb-3">Available Trading Types</label>
+                        <p class="text-slate-400 text-sm mb-3">Select which types of trades can be performed for this symbol</p>
+                        <div class="flex flex-wrap gap-3">
+                            <label class="relative flex items-center">
+                                <input type="checkbox" id="edit-trade-type-equity" class="sr-only">
+                                <span class="px-4 py-2 border-2 border-slate-600 rounded-lg cursor-pointer hover:border-green-500 transition-all duration-200 has-[:checked]:border-green-500 has-[:checked]:bg-green-500/20 text-green-300">
+                                    <i data-lucide="trending-up" class="w-4 h-4 mr-1 inline"></i>Equity
+                                </span>
+                            </label>
+                            <label class="relative flex items-center">
+                                <input type="checkbox" id="edit-trade-type-futures" class="sr-only">
+                                <span class="px-4 py-2 border-2 border-slate-600 rounded-lg cursor-pointer hover:border-purple-500 transition-all duration-200 has-[:checked]:border-purple-500 has-[:checked]:bg-purple-500/20 text-purple-300">
+                                    <i data-lucide="arrow-up-right" class="w-4 h-4 mr-1 inline"></i>Futures
+                                </span>
+                            </label>
+                            <label class="relative flex items-center">
+                                <input type="checkbox" id="edit-trade-type-options" class="sr-only">
+                                <span class="px-4 py-2 border-2 border-slate-600 rounded-lg cursor-pointer hover:border-amber-500 transition-all duration-200 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-500/20 text-amber-300">
+                                    <i data-lucide="grid-3x3" class="w-4 h-4 mr-1 inline"></i>Options
+                                </span>
+                            </label>
+                        </div>
+                        <p class="text-slate-400 text-xs mt-2">
+                            <i data-lucide="info" class="w-3 h-3 inline mr-1"></i>
+                            These options are automatically detected based on the symbol's F&O eligibility. You can deselect to disable.
+                        </p>
+                    </div>
+
+                    <!-- Options Configuration (shown when Options is available) -->
+                    <div id="edit-options-config-section" class="hidden mb-6">
+                        <div class="bg-gradient-to-r from-amber-900/20 to-orange-900/20 rounded-lg p-4 border border-amber-500/30">
+                            <h4 class="text-white font-semibold mb-3 flex items-center">
+                                <i data-lucide="cog" class="w-4 h-4 mr-2 text-amber-400"></i>
+                                Options Configuration
+                            </h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-white font-medium mb-2">Relative Strike Selection</label>
+                                    <select id="edit-options-strike-offset" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                        <option value="ITM3">ITM3 (Deep In The Money)</option>
+                                        <option value="ITM2">ITM2 (In The Money)</option>
+                                        <option value="ITM1">ITM1 (Slightly In The Money)</option>
+                                        <option value="ATM" selected>ATM (At The Money)</option>
+                                        <option value="OTM1">OTM1 (Slightly Out of The Money)</option>
+                                        <option value="OTM2">OTM2 (Out of The Money)</option>
+                                        <option value="OTM3">OTM3 (Deep Out of The Money)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-white font-medium mb-2">Expiry</label>
+                                    <div class="relative">
+                                        <input type="text" id="edit-options-expiry" value="Auto (Nearest)" readonly class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-300 cursor-not-allowed">
+                                        <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                                            <i data-lucide="calendar" class="w-4 h-4 text-amber-400"></i>
+                                        </div>
+                                    </div>
+                                    <p class="text-slate-400 text-xs mt-1">Auto-refreshes every Wednesday & Friday at 8:00 AM</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product & Order Type -->
+                <div class="border border-slate-700/50 rounded-lg p-6 bg-slate-700/20">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="settings" class="w-5 h-5 mr-2 text-purple-400"></i>
+                        Product & Order Type
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Product Type</label>
+                            <select id="edit-product-type" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="MIS">MIS (Intraday)</option>
+                                <option value="CNC">CNC (Delivery)</option>
+                                <option value="NRML">NRML (Normal)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-white font-medium mb-2">Order Type</label>
+                            <select id="edit-order-type" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="MARKET">MARKET</option>
+                                <option value="LIMIT">LIMIT</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Target Settings -->
+                <div class="border border-slate-700/50 rounded-lg p-6 bg-slate-700/20">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="target" class="w-5 h-5 mr-2 text-green-400"></i>
+                        Target Settings
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Target Type</label>
+                            <select id="edit-target-type" onchange="updateEditTargetFields()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="NONE">None</option>
+                                <option value="POINTS">Points</option>
+                                <option value="PERCENTAGE">Percentage</option>
+                            </select>
+                        </div>
+                        <div id="edit-target-value-group">
+                            <label class="block text-white font-medium mb-2">Target Value</label>
+                            <input type="number" id="edit-target-value" min="0" step="0.01" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Points or Percentage</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stop Loss Settings -->
+                <div class="border border-slate-700/50 rounded-lg p-6 bg-slate-700/20">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="shield" class="w-5 h-5 mr-2 text-red-400"></i>
+                        Stop Loss Settings
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Stop Loss Type</label>
+                            <select id="edit-sl-type" onchange="updateEditSLFields()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="NONE">None</option>
+                                <option value="POINTS">Points</option>
+                                <option value="PERCENTAGE">Percentage</option>
+                            </select>
+                        </div>
+                        <div id="edit-sl-value-group">
+                            <label class="block text-white font-medium mb-2">Stop Loss Value</label>
+                            <input type="number" id="edit-sl-value" min="0" step="0.01" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Points or Percentage</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trailing Stop Loss -->
+                <div class="border border-slate-700/50 rounded-lg p-6 bg-slate-700/20">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="trending-up" class="w-5 h-5 mr-2 text-yellow-400"></i>
+                        Trailing Stop Loss
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Trailing Type</label>
+                            <select id="edit-ts-type" onchange="updateEditTSFields()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="NONE">None</option>
+                                <option value="POINTS">Points</option>
+                                <option value="PERCENTAGE">Percentage</option>
+                            </select>
+                        </div>
+                        <div id="edit-ts-value-group">
+                            <label class="block text-white font-medium mb-2">Trailing Value</label>
+                            <input type="number" id="edit-ts-value" min="0" step="0.01" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Points or Percentage</p>
+                        </div>
+                    </div>
+                    <div id="edit-trailing-activation-group" class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Activation Type</label>
+                            <select id="edit-trailing-activation-type" onchange="updateEditTrailingActivationFields()" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="IMMEDIATE">Immediate</option>
+                                <option value="POINTS">Points</option>
+                                <option value="PERCENTAGE">Percentage</option>
+                            </select>
+                        </div>
+                        <div id="edit-trailing-activation-value-group">
+                            <label class="block text-white font-medium mb-2">Activation Value</label>
+                            <input type="number" id="edit-trailing-activation-value" min="0" step="0.01" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Points or Percentage</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advanced Settings -->
+                <div class="border border-slate-700/50 rounded-lg p-6 bg-slate-700/20">
+                    <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                        <i data-lucide="sliders" class="w-5 h-5 mr-2 text-indigo-400"></i>
+                        Advanced Settings
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-white font-medium mb-2">Max Position Size</label>
+                            <input type="number" id="edit-max-position-size" min="0" step="1" placeholder="Optional" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Maximum position size limit</p>
+                        </div>
+                        <div>
+                            <label class="block text-white font-medium mb-2">Max Instances</label>
+                            <input type="number" id="edit-max-instances" min="0" step="1" placeholder="Optional" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Max instances that can trade this</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div id="edit-contract-multiplier-group">
+                            <label class="block text-white font-medium mb-2">Contract Multiplier</label>
+                            <input type="number" id="edit-contract-multiplier" min="0.01" step="0.01" value="1.0" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                            <p class="text-slate-400 text-xs mt-1">Multiplier for derivatives (default 1.0)</p>
+                        </div>
+                        <div id="edit-rounding-group">
+                            <label class="block text-white font-medium mb-2">Rounding</label>
+                            <select id="edit-rounding" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                                <option value="floor_to_lot">Floor to Lot</option>
+                                <option value="none">No Rounding</option>
+                            </select>
+                            <p class="text-slate-400 text-xs mt-1">How to round calculated quantity</p>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="flex items-center space-x-3">
+                            <input type="checkbox" id="edit-is-enabled" class="w-5 h-5 rounded border-slate-600 bg-slate-700/50 text-blue-500 focus:ring-2 focus:ring-blue-500">
+                            <div>
+                                <span class="text-white font-medium">Symbol Enabled</span>
+                                <p class="text-slate-400 text-xs">Allow trading for this symbol</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="flex justify-end space-x-4 pt-6 border-t border-slate-700">
+                    <button type="button" onclick="closeEditSymbolConfigModal()" class="px-6 py-3 text-slate-300 hover:text-white border border-slate-600 hover:border-slate-500 rounded-lg transition-all duration-200">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2">
+                        <i data-lucide="save" class="w-4 h-4"></i>
+                        <span>Save Configuration</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Import CSV Modal -->
+    <div id="import-csv-modal" class="modal fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[70] items-center justify-center">
+        <div class="max-w-2xl w-full bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-white">Import CSV - <span id="import-watchlist-name">Watchlist</span></h2>
+                <button onclick="closeImportCsvModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div class="space-y-6">
+                <!-- CSV Format Info -->
+                <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                    <h3 class="text-white font-semibold mb-2 flex items-center">
+                        <i data-lucide="info" class="w-4 h-4 mr-2 text-blue-400"></i>
+                        CSV Format
+                    </h3>
+                    <p class="text-slate-300 text-sm mb-2">Your CSV file should have the following columns:</p>
+                    <code class="text-xs text-blue-300 bg-slate-900/50 p-2 rounded block">
+                        symbol,exchange,qty_type,qty_value,qty_units,ts_type,ts_value,sl_type,sl_value,product_type,order_type,is_enabled,max_position_size,max_instances,capital_ceiling,contract_multiplier,rounding,is_fno_mode
+                    </code>
+                </div>
+
+                <!-- File Upload -->
+                <div>
+                    <label class="block text-white font-medium mb-2">Select CSV File</label>
+                    <input type="file" id="csv-file-input" accept=".csv" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                    <p class="text-slate-400 text-xs mt-1">Maximum file size: 1MB</p>
+                </div>
+
+                <!-- Import Mode -->
+                <div>
+                    <label class="block text-white font-medium mb-3">Import Mode</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center p-3 border border-slate-600 rounded-lg cursor-pointer hover:border-blue-500 transition-all duration-200 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-500/10">
+                            <input type="radio" name="import-mode" value="append" checked class="mr-3">
+                            <div>
+                                <div class="text-white font-medium">Append</div>
+                                <div class="text-slate-400 text-sm">Add symbols to existing ones</div>
+                            </div>
+                        </label>
+                        <label class="flex items-center p-3 border border-slate-600 rounded-lg cursor-pointer hover:border-blue-500 transition-all duration-200 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-500/10">
+                            <input type="radio" name="import-mode" value="replace" class="mr-3">
+                            <div>
+                                <div class="text-white font-medium">Replace</div>
+                                <div class="text-slate-400 text-sm">Remove all existing symbols first</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex justify-end space-x-4 pt-6 mt-6 border-t border-slate-700">
+                <button type="button" onclick="closeImportCsvModal()" class="px-6 py-3 text-slate-300 hover:text-white border border-slate-600 hover:border-slate-500 rounded-lg transition-all duration-200">
+                    Cancel
+                </button>
+                <button onclick="importWatchlistCsv()" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2">
+                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    <span>Import CSV</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+
+    <script>
+        // Sidebar collapse functionality
+        let isSidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+        const SIDEBAR_EXPANDED_WIDTH = 256;
+        const SIDEBAR_COLLAPSED_WIDTH = 72;
+
+        function toggleSidebarCollapse() {
+            isSidebarCollapsed = !isSidebarCollapsed;
+            localStorage.setItem('sidebarCollapsed', isSidebarCollapsed);
+            applySidebarState();
+        }
+
+        function applySidebarState() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+            const collapseIcon = document.getElementById('sidebar-collapse-icon');
+            const sidebarTexts = document.querySelectorAll('.sidebar-text');
+            const tooltips = document.querySelectorAll('.sidebar-tooltip');
+
+            if (isSidebarCollapsed) {
+                // Collapse sidebar
+                sidebar.style.width = SIDEBAR_COLLAPSED_WIDTH + 'px';
+                mainContent.style.marginLeft = SIDEBAR_COLLAPSED_WIDTH + 'px';
+                sidebarTexts.forEach(el => el.style.display = 'none');
+                collapseIcon.style.transform = 'rotate(180deg)';
+                collapseIcon.setAttribute('data-lucide', 'chevron-right');
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            } else {
+                // Expand sidebar
+                sidebar.style.width = SIDEBAR_EXPANDED_WIDTH + 'px';
+                mainContent.style.marginLeft = SIDEBAR_EXPANDED_WIDTH + 'px';
+                sidebarTexts.forEach(el => el.style.display = '');
+                collapseIcon.style.transform = 'rotate(0deg)';
+                collapseIcon.setAttribute('data-lucide', 'chevron-left');
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            }
+        }
+
+        // Show tooltips when hovering over nav items in collapsed state
+        document.addEventListener('DOMContentLoaded', function() {
+            const navItems = document.querySelectorAll('nav[role="navigation"] > a');
+            navItems.forEach(item => {
+                item.addEventListener('mouseenter', function() {
+                    if (isSidebarCollapsed) {
+                        const tooltip = this.querySelector('.sidebar-tooltip');
+                        if (tooltip) {
+                            tooltip.classList.remove('hidden');
+                        }
+                    }
+                });
+
+                item.addEventListener('mouseleave', function() {
+                    const tooltip = this.querySelector('.sidebar-tooltip');
+                    if (tooltip) {
+                        tooltip.classList.add('hidden');
+                    }
+                });
+            });
+
+            // Also handle user profile tooltip
+            const userProfile = document.querySelector('.absolute.bottom-6 .group');
+            if (userProfile) {
+                userProfile.addEventListener('mouseenter', function() {
+                    if (isSidebarCollapsed) {
+                        const tooltip = this.querySelector('.sidebar-tooltip');
+                        if (tooltip) {
+                            tooltip.classList.remove('hidden');
+                        }
+                    }
+                });
+
+                userProfile.addEventListener('mouseleave', function() {
+                    const tooltip = this.querySelector('.sidebar-tooltip');
+                    if (tooltip) {
+                        tooltip.classList.add('hidden');
+                    }
+                });
+            }
+
+            // Apply saved state on page load
+            setTimeout(applySidebarState, 100);
+        });
+
+        // Re-apply on window resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth < 768) {
+                // On mobile, ensure sidebar is hidden
+                const sidebar = document.getElementById('sidebar');
+                const mainContent = document.getElementById('main-content');
+                sidebar.style.transform = 'translateX(-100%)';
+                mainContent.style.marginLeft = '0';
+            } else {
+                // On desktop, apply saved state
+                applySidebarState();
+            }
+        });
+    </script>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Development Console -->
+    <div id="dev-console" class="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-sm border-t-2 border-blue-500/50 z-[60] transition-all duration-300" style="max-height: 40px; overflow: hidden;">
+        <div class="bg-slate-800/80 border-b border-slate-700/50 px-4 py-2 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <button onclick="toggleConsole()" class="text-slate-300 hover:text-white transition-colors">
+                    <i data-lucide="terminal" class="w-5 h-5 inline mr-2"></i>
+                    <span class="font-semibold">Development Console</span>
+                    <span class="text-xs text-slate-500 ml-2">(click to expand)</span>
+                    <i data-lucide="chevron-up" id="console-toggle-icon" class="w-4 h-4 ml-2 inline transition-transform duration-200"></i>
+                </button>
+                <div class="text-xs text-slate-400">
+                    <span id="console-log-count">0</span> logs
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="clearConsole()" class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded transition-colors">
+                    <i data-lucide="trash-2" class="w-3 h-3 inline mr-1"></i>
+                    Clear
+                </button>
+                <button onclick="toggleConsolePause()" id="console-pause-btn" class="px-3 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 text-white rounded transition-colors">
+                    <i data-lucide="play" class="w-3 h-3 inline mr-1"></i>
+                    <span>Pause</span>
+                </button>
+            </div>
+        </div>
+        <div id="console-output" class="p-4 font-mono text-sm overflow-y-auto" style="max-height: 300px;">
+            <div class="console-empty text-slate-500 text-center py-8">
+                <i data-lucide="terminal" class="w-12 h-12 mx-auto mb-2 text-slate-600"></i>
+                <p>Console logs will appear here...</p>
+                <p class="text-xs mt-1">All API calls, user actions, and system events will be logged</p>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        #dev-console.active {
+            max-height: 350px !important;
+        }
+        #dev-console:not(.active) {
+            max-height: 40px !important;
+            overflow: hidden;
+        }
+        #console-toggle-icon.rotated {
+            transform: rotate(180deg);
+        }
+        .console-log {
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            border-left: 3px solid;
+            word-wrap: break-word;
+            animation: slideIn 0.2s ease-out;
+        }
+        .console-log.api-request {
+            background: rgba(59, 130, 246, 0.1);
+            border-left-color: #3B82F6;
+        }
+        .console-log.api-success {
+            background: rgba(16, 185, 129, 0.1);
+            border-left-color: #10B981;
+        }
+        .console-log.api-error {
+            background: rgba(239, 68, 68, 0.1);
+            border-left-color: #EF4444;
+        }
+        .console-log.user-action {
+            background: rgba(168, 85, 247, 0.1);
+            border-left-color: #A855F7;
+        }
+        .console-log.system {
+            background: rgba(245, 158, 11, 0.1);
+            border-left-color: #F59E0B;
+        }
+        .console-log .timestamp {
+            color: #64748B;
+            font-size: 11px;
+            margin-right: 8px;
+        }
+        .console-log .type {
+            font-weight: 600;
+            margin-right: 8px;
+        }
+        .console-log .message {
+            color: #E2E8F0;
+        }
+        .console-log .details {
+            margin-top: 6px;
+            padding-left: 12px;
+            border-left: 2px solid rgba(148, 163, 184, 0.2);
+            color: #94A3B8;
+            font-size: 12px;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</body>
+</html>

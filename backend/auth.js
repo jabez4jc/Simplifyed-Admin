@@ -93,7 +93,7 @@ export function configureAuth(app, basePath, dbAsync) {
         email: userEmail,
         emails: profile.emails,
         name: profile.displayName,
-        picture: profile.photos[0].value,
+        picture: profile.photos?.[0]?.value || null,
         provider: 'google'
       };
       
@@ -104,6 +104,7 @@ export function configureAuth(app, basePath, dbAsync) {
         // First user - make them admin
         await dbAsync.run('INSERT INTO users (email, is_admin) VALUES (?, 1)', [userEmail]);
         console.log(`✅ First user registered as admin: ${user.name} (${userEmail})`);
+        user.is_admin = true;
         return done(null, user);
       }
       
@@ -114,7 +115,8 @@ export function configureAuth(app, basePath, dbAsync) {
         console.log(`❌ Unauthorized user attempt: ${user.name} (${userEmail})`);
         return done(null, false, { message: 'User not authorized. Please contact support@simplifyed.in to request access.' });
       }
-      
+
+      user.is_admin = Boolean(authorizedUser.is_admin);
       console.log(`✅ User authenticated: ${user.name} (${userEmail})`);
       return done(null, user);
     } catch (error) {
@@ -125,11 +127,26 @@ export function configureAuth(app, basePath, dbAsync) {
 
   // Serialize/Deserialize user
   passport.serializeUser((user, done) => {
-    done(null, user);
+    done(null, {
+      email: user.email,
+      name: user.name,
+      picture: user.picture || null,
+      provider: user.provider || 'google'
+    });
   });
 
-  passport.deserializeUser((user, done) => {
-    done(null, user);
+  passport.deserializeUser(async (storedUser, done) => {
+    try {
+      const record = await dbAsync.get('SELECT email, is_admin FROM users WHERE email = ?', [storedUser.email]);
+      const isAdmin = Boolean(record?.is_admin);
+      done(null, {
+        ...storedUser,
+        is_admin: isAdmin
+      });
+    } catch (error) {
+      console.error('❌ Failed to deserialize user:', error);
+      done(error);
+    }
   });
 }
 
@@ -144,20 +161,20 @@ export function setupAuthRoutes(app) {
   );
 
   app.get('/auth/google/callback',
-    passport.authenticate('google', { 
+    passport.authenticate('google', {
       failureRedirect: '/auth/unauthorized',
-      failureFlash: false 
+      failureFlash: false
     }),
     (req, res) => {
       console.log(`🔐 User ${req.user.name} logged in successfully`);
-      // Redirect to frontend
-      res.redirect(process.env.FRONTEND_URL || 'http://localhost:8080');
+      // Redirect to unified dashboard
+      res.redirect('/dashboard.html');
     }
   );
 
   // Unauthorized access route
   app.get('/auth/unauthorized', (req, res) => {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const frontendUrl = '/dashboard.html';
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -194,7 +211,7 @@ export function setupAuthRoutes(app) {
 
   // Login page route
   app.get('/login', (req, res) => {
-    res.redirect(process.env.FRONTEND_URL || 'http://localhost:3000');
+    res.redirect('/dashboard.html');
   });
 
   // Logout route
@@ -207,18 +224,85 @@ export function setupAuthRoutes(app) {
         console.log(`👋 User ${userName} logged out`);
       }
       req.session.destroy(() => {
-        res.redirect(process.env.FRONTEND_URL || 'http://localhost:8080');
+        res.redirect('/dashboard.html');
       });
     });
   });
 }
 
+// Check if test mode is enabled
+const isTestMode = process.env.TEST_MODE === 'true';
+console.log('🔍 TEST_MODE check:', { value: process.env.TEST_MODE, isTestMode });
+
+// Test mode user
+const testUser = {
+  email: 'test@simplifyed.in',
+  name: 'Test User',
+  picture: null,
+  provider: 'test',
+  is_admin: true
+};
+
 // Authentication middleware
 export function requireAuth(req, res, next) {
+  // Check if test mode is enabled
+  if (isTestMode) {
+    // In test mode, create a test session
+    req.user = testUser;
+    return next();
+  }
+
   if (req.isAuthenticated()) {
     return next();
   }
   res.status(401).json({ error: 'Authentication required' });
+}
+
+export async function requireAdminAccess(req, res, next) {
+  // Check if test mode is enabled
+  if (isTestMode) {
+    // In test mode, user is already admin
+    req.user = testUser;
+    return next();
+  }
+
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  if (req.user?.is_admin) {
+    return next();
+  }
+
+  try {
+    const dbAsync = req.app?.locals?.dbAsync;
+    if (!dbAsync) {
+      throw new Error('Database handle unavailable');
+    }
+
+    const record = await dbAsync.get(
+      'SELECT is_admin FROM users WHERE email = ?',
+      [req.user?.email?.toLowerCase()]
+    );
+
+    if (record?.is_admin) {
+      req.user = { ...req.user, is_admin: Boolean(record.is_admin) };
+      return next();
+    }
+
+    return res.status(403).json({ error: 'Admin privileges required' });
+  } catch (error) {
+    console.error('❌ Admin privilege verification failed:', error);
+    return res.status(500).json({ error: 'Failed to verify admin privileges' });
+  }
+}
+
+// Log test mode status
+if (isTestMode) {
+  console.log('🧪 TEST MODE ENABLED - Authentication bypassed');
+  console.log('   Test user: test@simplifyed.in (Admin)');
+} else {
+  console.log('🔐 Authentication enabled (Google OAuth)');
 }
 
 console.log('✅ Authentication module loaded successfully');

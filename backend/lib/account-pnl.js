@@ -6,13 +6,17 @@ export async function getAccountPnL(instance, makeRequest) {
   try {
     // Get tradebook data for realized P&L
     const tradesResp = await makeRequest(instance, 'tradebook');
-    const trades = (tradesResp && tradesResp.status === 'success' && tradesResp.data && tradesResp.data.trades)
-      ? tradesResp.data.trades : [];
+    // OpenAlgo returns data directly as an array, not nested in data.trades
+    const trades = (tradesResp && tradesResp.status === 'success' && tradesResp.data)
+      ? (Array.isArray(tradesResp.data) ? tradesResp.data : (tradesResp.data.trades || []))
+      : [];
 
     // Get positionbook data for unrealized P&L
     const positionsResp = await makeRequest(instance, 'positionbook');
-    const positions = (positionsResp && positionsResp.status === 'success' && positionsResp.data && positionsResp.data.positions)
-      ? positionsResp.data.positions : [];
+    // OpenAlgo returns data directly as an array, not nested in data.positions
+    const positions = (positionsResp && positionsResp.status === 'success' && positionsResp.data)
+      ? (Array.isArray(positionsResp.data) ? positionsResp.data : (positionsResp.data.positions || []))
+      : [];
 
     const realized = calculateRealizedPnL(trades);
     const unrealized = calculateUnrealizedPnL(positions);
@@ -40,9 +44,10 @@ export async function getAccountPnL(instance, makeRequest) {
     // Fallback: try getting only positions
     try {
       const positionsResp = await makeRequest(instance, 'positionbook');
-      const fallbackPnL = (positionsResp && positionsResp.status === 'success' && positionsResp.data && positionsResp.data.positions)
-        ? positionsResp.data.positions.reduce((total, pos) => total + parseFloat(pos.pnl || 0), 0)
-        : 0;
+      const positions = (positionsResp && positionsResp.status === 'success' && positionsResp.data)
+        ? (Array.isArray(positionsResp.data) ? positionsResp.data : (positionsResp.data.positions || []))
+        : [];
+      const fallbackPnL = positions.reduce((total, pos) => total + parseFloat(pos.pnl || 0), 0);
 
       return {
         perSymbol: [],

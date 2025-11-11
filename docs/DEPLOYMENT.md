@@ -142,11 +142,10 @@ cat /opt/simplifyed-admin/GOOGLE_OAUTH_SETUP.md
 │   ├── server.js                  # Main server file
 │   ├── package.json               # Dependencies
 │   ├── .env                       # Production environment
+│   ├── public/                    # Static dashboard files
+│   │   ├── dashboard.html         # Unified dashboard UI
+│   │   └── dashboard.js           # Dashboard logic
 │   └── database/                  # SQLite databases
-├── frontend/                       # Frontend static files
-│   ├── index.html                 # Main dashboard
-│   ├── app.js                     # Frontend logic
-│   └── styles/                    # CSS styles
 ├── install-ubuntu.sh              # Installation script
 └── GOOGLE_OAUTH_SETUP.md          # OAuth configuration guide
 

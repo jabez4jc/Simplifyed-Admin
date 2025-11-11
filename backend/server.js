@@ -9,11 +9,34 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import crypto from 'crypto';
-import dotenv from 'dotenv';
+
+// Get the directory of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 import { configureAuth, setupAuthRoutes, requireAuth } from './auth.js';
 import { updateInstancesData as updater_updateInstancesData, performHealthChecks as updater_performHealthChecks } from './lib/instance-updater.js';
-
-dotenv.config();
+import watchlistRoutes from './routes/watchlist.js';
+import symbolRoutes from './routes/symbols.js';
+import symbolSearchRoutes from './routes/symbol-search.js';
+import instanceConfigRoutes from './routes/instance-config.js';
+import websocketStatusRoutes from './routes/websocket-status.js';
+import watchlistOrderRoutes from './routes/watchlist-orders.js';
+import optionsRoutes from './routes/options.js';
+import quotesRoutes from './routes/quotes.js';
+import AlertService from './lib/alert-service.js';
+import WebSocketManager from './lib/websocket-manager.js';
+import MarketDataProcessor from './lib/market-data-processor.js';
+import PositionManager from './lib/position-manager.js';
+import RuleEvaluator from './lib/rule-evaluator.js';
+import RateLimiterManager from './lib/rate-limiter.js';
+import OrderPlacementService from './lib/order-placement-service.js';
+import OrderStatusTracker from './lib/order-status-tracker.js';
+import OptionsTradingService from './lib/options-trading-service.js';
+import MarketDataRefreshService from './lib/market-data-refresh-service.js';
+import createPositionRoutes from './routes/positions.js';
+import createOrderRoutes from './routes/orders.js';
+import { Server as SocketIOServer } from 'socket.io';
 
 const ALLOWED_HOST_PROTOCOLS = new Set(['http:', 'https:']);
 const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
@@ -68,9 +91,6 @@ const requestTimeoutMs = (() => {
   const parsed = Number.parseInt(process.env.OPENALGO_REQUEST_TIMEOUT_MS || '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REQUEST_TIMEOUT_MS;
 })();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -161,7 +181,128 @@ async function initializeDatabase() {
     } catch (error) {
       // Column already exists, ignore error
     }
-    
+
+    // Create rate_limit_log table for tracking API usage
+    await dbAsync.run(`
+      CREATE TABLE IF NOT EXISTS rate_limit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        instance_id INTEGER NOT NULL,
+        endpoint TEXT NOT NULL,
+        tokens_available INTEGER NOT NULL,
+        wait_time_ms INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (instance_id) REFERENCES instances (id)
+      )
+    `);
+
+    // Create watchlists table
+    await dbAsync.run(`
+      CREATE TABLE IF NOT EXISTS watchlists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create watchlist_symbols table
+    await dbAsync.run(`
+      CREATE TABLE IF NOT EXISTS watchlist_symbols (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        watchlist_id INTEGER NOT NULL,
+        exchange TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        token TEXT,
+        lot_size INTEGER DEFAULT 1,
+        qty_type TEXT DEFAULT 'FIXED',
+        qty_value INTEGER DEFAULT 1,
+        qty_mode TEXT DEFAULT 'fixed',
+        qty_units TEXT DEFAULT 'units',
+        min_qty_per_click INTEGER DEFAULT 1,
+        max_qty_per_click INTEGER,
+        capital_ceiling_per_trade REAL,
+        contract_multiplier REAL DEFAULT 1.0,
+        rounding TEXT DEFAULT 'floor_to_lot',
+        product_type TEXT DEFAULT 'MIS',
+        order_type TEXT DEFAULT 'MARKET',
+        target_type TEXT DEFAULT 'NONE',
+        target_value REAL,
+        sl_type TEXT DEFAULT 'NONE',
+        sl_value REAL,
+        ts_type TEXT DEFAULT 'NONE',
+        ts_value REAL,
+        trailing_activation_type TEXT DEFAULT 'IMMEDIATE',
+        trailing_activation_value REAL,
+        max_position_size INTEGER,
+        max_instances INTEGER,
+        is_enabled BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (watchlist_id) REFERENCES watchlists (id) ON DELETE CASCADE
+      )
+    `);
+
+    // Create watchlist_instances table (Junction table)
+    await dbAsync.run(`
+      CREATE TABLE IF NOT EXISTS watchlist_instances (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        watchlist_id INTEGER NOT NULL,
+        instance_id INTEGER NOT NULL,
+        assigned_by TEXT,
+        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (watchlist_id) REFERENCES watchlists (id) ON DELETE CASCADE,
+        FOREIGN KEY (instance_id) REFERENCES instances (id) ON DELETE CASCADE,
+        UNIQUE(watchlist_id, instance_id)
+      )
+    `);
+
+    // Create symbol_search_cache table for caching search results
+    await dbAsync.run(`
+      CREATE TABLE IF NOT EXISTS symbol_search_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        search_query TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        tradingsymbol TEXT NOT NULL,
+        exchange TEXT NOT NULL,
+        exchange_segment TEXT,
+        instrument_type TEXT,
+        lot_size INTEGER,
+        tick_size REAL,
+        name TEXT,
+        isin TEXT,
+        asset_class TEXT DEFAULT 'EQUITY',
+        can_trade_equity INTEGER DEFAULT 0,
+        can_trade_futures INTEGER DEFAULT 0,
+        can_trade_options INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(search_query, symbol, exchange)
+      )
+    `);
+
+    // Add new classification columns if they don't exist
+    try {
+      await dbAsync.run(`ALTER TABLE symbol_search_cache ADD COLUMN asset_class TEXT DEFAULT 'EQUITY'`);
+    } catch (e) {
+      // Column might already exist
+    }
+    try {
+      await dbAsync.run(`ALTER TABLE symbol_search_cache ADD COLUMN can_trade_equity INTEGER DEFAULT 0`);
+    } catch (e) {
+      // Column might already exist
+    }
+    try {
+      await dbAsync.run(`ALTER TABLE symbol_search_cache ADD COLUMN can_trade_futures INTEGER DEFAULT 0`);
+    } catch (e) {
+      // Column might already exist
+    }
+    try {
+      await dbAsync.run(`ALTER TABLE symbol_search_cache ADD COLUMN can_trade_options INTEGER DEFAULT 0`);
+    } catch (e) {
+      // Column might already exist
+    }
+
     console.log('✅ Database initialized successfully');
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
@@ -177,7 +318,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+  origin: process.env.BASE_URL || 'http://localhost:3000',
   credentials: true
 }));
 app.use(compression());
@@ -185,26 +326,56 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Serve static files from public directory
+app.use(express.static(join(__dirname, 'public')));
+
 // Setup auth routes
 setupAuthRoutes(app);
 
+// Make dbAsync available to routes
+app.locals.dbAsync = dbAsync;
+
+// Mount watchlist feature routes
+app.use('/api/watchlists', requireAuth, watchlistRoutes);
+app.use('/api/watchlists', requireAuth, symbolRoutes);
+app.use('/api/watchlists', requireAuth, watchlistOrderRoutes);
+app.use('/api/instances', requireAuth, instanceConfigRoutes);
+app.use('/api/websocket', requireAuth, websocketStatusRoutes);
+app.use('/api/symbols', requireAuth, symbolSearchRoutes);
+app.use('/api/symbols', requireAuth, symbolRoutes);
+app.use('/api/options', requireAuth, optionsRoutes);
+app.use('/api/quotes', requireAuth, quotesRoutes);
+
 // API Routes
 app.get('/api/user', async (req, res) => {
+  // Check if test mode is enabled
+  const isTestMode = process.env.TEST_MODE === 'true';
+
+  if (isTestMode) {
+    // In test mode, return the test user
+    res.json({
+      authenticated: true,
+      user: { email: 'test@simplifyed.in', name: 'Test User', is_admin: true },
+      isAdmin: true
+    });
+    return;
+  }
+
   if (req.isAuthenticated()) {
     try {
       // Check if user is admin
-      const userEmail = req.user.emails[0].value;
+      const userEmail = (req.user.email || '').toLowerCase();
       const currentUser = await dbAsync.get('SELECT * FROM users WHERE email = ?', [userEmail]);
-      
-      res.json({ 
-        authenticated: true, 
+
+      res.json({
+        authenticated: true,
         user: req.user,
         isAdmin: currentUser ? Boolean(currentUser.is_admin) : false
       });
     } catch (error) {
       console.error('Error checking user admin status:', error);
-      res.json({ 
-        authenticated: true, 
+      res.json({
+        authenticated: true,
         user: req.user,
         isAdmin: false
       });
@@ -226,20 +397,22 @@ app.get('/api/instances', requireAuth, async (req, res) => {
 
 app.post('/api/instances', requireAuth, async (req, res) => {
   try {
-    const { name, host_url, api_key, strategy_tag } = req.body;
+    const { name, host_url, api_key, strategy_tag, is_primary_admin, is_secondary_admin } = req.body;
     
     const trimmedName = typeof name === 'string' ? name.trim() : '';
     const normalizedHostUrl = normalizeHostUrl(host_url);
     const sanitizedApiKey = sanitizeApiKey(api_key);
     const sanitizedStrategyTag = typeof strategy_tag === 'string' && strategy_tag.trim() !== '' ? strategy_tag.trim() : null;
+    const isPrimaryAdmin = is_primary_admin ? 1 : 0;
+    const isSecondaryAdmin = is_secondary_admin ? 1 : 0;
 
     if (!trimmedName || !normalizedHostUrl || !sanitizedApiKey) {
       return res.status(400).json({ error: 'Name, host_url, and api_key are required' });
     }
 
     const result = await dbAsync.run(
-      'INSERT INTO instances (name, host_url, api_key, strategy_tag) VALUES (?, ?, ?, ?)',
-      [trimmedName, normalizedHostUrl, sanitizedApiKey, sanitizedStrategyTag]
+      'INSERT INTO instances (name, host_url, api_key, strategy_tag, is_primary_admin, is_secondary_admin) VALUES (?, ?, ?, ?, ?, ?)',
+      [trimmedName, normalizedHostUrl, sanitizedApiKey, sanitizedStrategyTag, isPrimaryAdmin, isSecondaryAdmin]
     );
 
     const newInstance = await dbAsync.get('SELECT * FROM instances WHERE id = ?', [result.lastID]);
@@ -273,7 +446,9 @@ app.put('/api/instances/:id', requireAuth, async (req, res) => {
       'target_profit',
       'target_loss',
       'is_active',
-      'is_analyzer_mode'
+      'is_analyzer_mode',
+      'is_primary_admin',
+      'is_secondary_admin'
     ]);
 
     const sanitizedUpdates = {};
@@ -322,7 +497,9 @@ app.put('/api/instances/:id', requireAuth, async (req, res) => {
           break;
         }
         case 'is_active':
-        case 'is_analyzer_mode': {
+        case 'is_analyzer_mode':
+        case 'is_primary_admin':
+        case 'is_secondary_admin': {
           sanitizedUpdates[key] = value ? 1 : 0;
           break;
         }
@@ -630,7 +807,7 @@ app.post('/api/refresh-instances', requireAuth, async (req, res) => {
 app.get('/api/users', requireAuth, async (req, res) => {
   try {
     // Check if user is first user (admin) or is admin
-    const userEmail = req.user.emails[0].value;
+    const userEmail = (req.user.email || '').toLowerCase();
     const currentUser = await dbAsync.get('SELECT * FROM users WHERE email = ?', [userEmail]);
     
     if (!currentUser || !currentUser.is_admin) {
@@ -649,7 +826,7 @@ app.get('/api/users', requireAuth, async (req, res) => {
 app.post('/api/users', requireAuth, async (req, res) => {
   try {
     // Check if user is first user (admin) or is admin
-    const userEmail = req.user.emails[0].value;
+    const userEmail = (req.user.email || '').toLowerCase();
     const currentUser = await dbAsync.get('SELECT * FROM users WHERE email = ?', [userEmail]);
     
     if (!currentUser || !currentUser.is_admin) {
@@ -682,7 +859,7 @@ app.post('/api/users', requireAuth, async (req, res) => {
 app.delete('/api/users/:email', requireAuth, async (req, res) => {
   try {
     // Check if user is first user (admin) or is admin
-    const userEmail = req.user.emails[0].value;
+    const userEmail = (req.user.email || '').toLowerCase();
     const currentUser = await dbAsync.get('SELECT * FROM users WHERE email = ?', [userEmail]);
     
     if (!currentUser || !currentUser.is_admin) {
@@ -767,11 +944,251 @@ async function makeOpenAlgoRequest(instance, endpoint, method = 'POST', data = {
 
 // Auto-switch implementation moved to `backend/lib/instance-updater.js` (autoSwitchToAnalyzer)
 
+// Initialize AlertService and WebSocketManager (Phase 2: WebSocket Integration)
+// Phase 3: Position Management
+// Phase 4: Order Placement & Rate Limiting
+let alertService = null;
+let wsManager = null;
+let marketDataProcessor = null;
+let positionManager = null;
+let ruleEvaluator = null;
+let rateLimiterManager = null;
+let orderPlacementService = null;
+let orderStatusTracker = null;
+let monitoringLoopInterval = null;
+let io = null;
+
+async function initializeWebSocketServices(httpServer) {
+  try {
+    console.log('🔌 Initializing WebSocket services...');
+
+    // Initialize AlertService with optional email config
+    const emailConfig = {
+      enabled: process.env.EMAIL_ALERTS_ENABLED === 'true',
+      host: process.env.EMAIL_HOST,
+      port: parseInt(process.env.EMAIL_PORT || '587'),
+      secure: process.env.EMAIL_SECURE === 'true',
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+      from: process.env.EMAIL_FROM,
+      to: process.env.EMAIL_TO
+    };
+
+    alertService = new AlertService(dbAsync, emailConfig);
+    console.log('✅ AlertService initialized');
+
+    // Initialize WebSocketManager
+    wsManager = new WebSocketManager(dbAsync, alertService);
+    console.log('✅ WebSocketManager initialized');
+
+    // Initialize MarketDataProcessor
+    marketDataProcessor = new MarketDataProcessor(dbAsync, wsManager);
+    console.log('✅ MarketDataProcessor initialized');
+
+    // Initialize Socket.IO for dashboard broadcasting
+    io = new SocketIOServer(httpServer, {
+      cors: {
+        origin: process.env.BASE_URL || 'http://localhost:3000',
+        credentials: true
+      }
+    });
+
+    // Handle frontend WebSocket connections
+    io.on('connection', (socket) => {
+      console.log(`🔌 Frontend client connected: ${socket.id}`);
+
+      socket.on('disconnect', () => {
+        console.log(`🔌 Frontend client disconnected: ${socket.id}`);
+      });
+
+      // Send initial market data cache
+      socket.emit('market_data_snapshot', Array.from(wsManager.marketDataCache.entries()));
+    });
+
+    // Forward market ticks to all connected frontend clients
+    wsManager.on('market_tick', (tick) => {
+      if (io) {
+        io.emit('market_tick', tick);
+      }
+    });
+
+    // Forward WebSocket status changes to frontend
+    wsManager.on('connected', (data) => {
+      if (io) {
+        io.emit('ws_status', { event: 'connected', data });
+      }
+    });
+
+    wsManager.on('disconnected', (data) => {
+      if (io) {
+        io.emit('ws_status', { event: 'disconnected', data });
+      }
+    });
+
+    // Start WebSocket connection to Primary Admin (if configured)
+    await wsManager.initialize();
+    console.log('✅ WebSocket services initialized successfully');
+
+    // Start MarketDataProcessor (batches DB updates every 1 second)
+    marketDataProcessor.start();
+    console.log('✅ MarketDataProcessor started');
+
+    // Make services available to routes
+    app.locals.alertService = alertService;
+    app.locals.wsManager = wsManager;
+    app.locals.marketDataProcessor = marketDataProcessor;
+
+    // Initialize Phase 3: Position Management
+    console.log('📊 Initializing Position Management...');
+
+    // Initialize PositionManager
+    positionManager = new PositionManager(dbAsync, alertService);
+    console.log('✅ PositionManager initialized');
+
+    // Initialize RuleEvaluator
+    ruleEvaluator = new RuleEvaluator(dbAsync, positionManager, alertService, wsManager);
+    console.log('✅ RuleEvaluator initialized');
+
+    // Mount position management routes
+    const positionRoutes = createPositionRoutes(dbAsync, positionManager, ruleEvaluator, alertService);
+    app.use('/api/positions', requireAuth, positionRoutes);
+    console.log('✅ Position management routes mounted');
+
+    // Start continuous monitoring loop (every 2 seconds)
+    startMonitoringLoop();
+    console.log('✅ Position monitoring loop started');
+
+    // Initialize Phase 4: Order Placement & Rate Limiting
+    console.log('📦 Initializing Order Placement & Rate Limiting...');
+
+    // Initialize RateLimiterManager
+    rateLimiterManager = new RateLimiterManager(dbAsync);
+    console.log('✅ RateLimiterManager initialized');
+
+    // Initialize OrderPlacementService
+    orderPlacementService = new OrderPlacementService(dbAsync, rateLimiterManager, alertService, makeOpenAlgoRequest);
+    console.log('✅ OrderPlacementService initialized');
+
+    // Make OrderPlacementService and makeOpenAlgoRequest available to routes
+    app.locals.orderPlacementService = orderPlacementService;
+    app.locals.makeOpenAlgoRequest = makeOpenAlgoRequest;
+
+    // Connect OrderPlacementService to PositionManager
+    positionManager.setOrderPlacementService(orderPlacementService);
+    console.log('✅ PositionManager connected to OrderPlacementService');
+
+    // Initialize OrderStatusTracker
+    orderStatusTracker = new OrderStatusTracker(dbAsync, orderPlacementService, alertService);
+    console.log('✅ OrderStatusTracker initialized');
+
+    // Initialize OptionsTradingService
+    const optionsTradingService = new OptionsTradingService(dbAsync, makeOpenAlgoRequest);
+    console.log('✅ OptionsTradingService initialized');
+
+    // Make OptionsTradingService available to routes
+    app.locals.optionsTradingService = optionsTradingService;
+
+    // Start order status polling
+    orderStatusTracker.start();
+    console.log('✅ Order status tracking started');
+
+    // Initialize Phase 6: Market Data Refresh Service
+    console.log('📈 Initializing Market Data Refresh Service...');
+
+    // Initialize MarketDataRefreshService
+    const marketDataRefreshService = new MarketDataRefreshService(dbAsync, makeOpenAlgoRequest, alertService);
+    console.log('✅ MarketDataRefreshService initialized');
+
+    // Make MarketDataRefreshService available to routes
+    app.locals.marketDataRefreshService = marketDataRefreshService;
+
+    // Start market data refresh (every 30 seconds)
+    marketDataRefreshService.start();
+    console.log('✅ Market data refresh service started');
+
+    // Mount order management routes
+    const orderRoutes = createOrderRoutes(dbAsync, orderPlacementService, rateLimiterManager);
+    app.use('/api/orders', requireAuth, orderRoutes);
+    console.log('✅ Order management routes mounted');
+
+  } catch (error) {
+    console.error('❌ Failed to initialize WebSocket services:', error);
+    console.log('⚠️  Server will continue without WebSocket functionality');
+  }
+}
+
+/**
+ * Start continuous monitoring loop for position exit detection
+ * Runs every 2 seconds to evaluate all open positions
+ */
+function startMonitoringLoop() {
+  if (monitoringLoopInterval) {
+    clearInterval(monitoringLoopInterval);
+  }
+
+  monitoringLoopInterval = setInterval(async () => {
+    try {
+      if (!ruleEvaluator) {
+        return;
+      }
+
+      const result = await ruleEvaluator.evaluateExitSignals();
+
+      // Log only if positions were evaluated or closed
+      if (result.evaluated > 0) {
+        console.log(`[MonitoringLoop] Evaluated ${result.evaluated} positions, closed ${result.closed}`);
+      }
+
+      // If positions were closed, emit event to frontend
+      if (result.closed > 0 && io) {
+        io.emit('positions_closed', {
+          count: result.closed,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      console.error('[MonitoringLoop] Error in monitoring loop:', error.message);
+    }
+  }, 2000); // Run every 2 seconds
+
+  console.log('✅ Position monitoring loop started (2-second interval)');
+}
+
+/**
+ * Stop monitoring loop (for graceful shutdown)
+ */
+function stopMonitoringLoop() {
+  if (monitoringLoopInterval) {
+    clearInterval(monitoringLoopInterval);
+    monitoringLoopInterval = null;
+    console.log('🛑 Position monitoring loop stopped');
+  }
+}
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('📪 SIGTERM received, shutting down gracefully...');
+  stopMonitoringLoop();
+  if (orderStatusTracker) {
+    orderStatusTracker.stop();
+  }
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('📪 SIGINT received, shutting down gracefully...');
+  stopMonitoringLoop();
+  if (orderStatusTracker) {
+    orderStatusTracker.stop();
+  }
+  process.exit(0);
+});
+
 // Schedule instance data updates every 30 seconds (as per architecture requirements)
 cron.schedule('*/30 * * * * *', () => updater_updateInstancesData(dbAsync, makeOpenAlgoRequest));
 
-// Schedule health checks every 20 minutes (as per architecture requirements)
-cron.schedule('*/20 * * * *', () => updater_performHealthChecks(dbAsync, makeOpenAlgoRequest));
+// Schedule health checks every 30 seconds (updated from 20 minutes)
+cron.schedule('*/30 * * * * *', () => updater_performHealthChecks(dbAsync, makeOpenAlgoRequest));
 
 // Run initial data update after 3 seconds
 setTimeout(() => {
@@ -783,11 +1200,19 @@ setTimeout(() => {
 async function startServer() {
   try {
     await initializeDatabase();
-    
-    app.listen(port, () => {
+
+    // Create HTTP server for Socket.IO
+    const http = await import('http');
+    const httpServer = http.createServer(app);
+
+    // Start HTTP server
+    httpServer.listen(port, async () => {
       console.log(`🚀 Simplifyed Trading Backend running on port ${port}`);
       console.log(`🔗 API Base URL: http://localhost:${port}/api`);
       console.log(`🔐 Auth URL: http://localhost:${port}/auth/google`);
+
+      // Initialize WebSocket services after server starts
+      await initializeWebSocketServices(httpServer);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

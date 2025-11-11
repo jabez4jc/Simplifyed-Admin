@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Test - Simplifyed Admin</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        .container {
+            background: #1e293b;
+            padding: 40px;
+            border-radius: 16px;
+            border: 1px solid #334155;
+        }
+        h1 {
+            color: #f1f5f9;
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: inline-block;
+            background: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            margin: 10px 10px 10px 0;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn:hover {
+            background: #2563eb;
+        }
+        .btn-secondary {
+            background: #6b7280;
+        }
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        .status {
+            background: #374151;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .success {
+            color: #10b981;
+        }
+        .error {
+            color: #ef4444;
+        }
+        .info {
+            color: #60a5fa;
+        }
+        pre {
+            background: #111827;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        .divider {
+            border-top: 1px solid #334155;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Authentication Test Page</h1>
+
+        <div class="status" id="status">
+            <p class="info">Click the button below to test Google OAuth authentication:</p>
+        </div>
+
+        <div>
+            <a href="/auth/google" class="btn">🔑 Login with Google</a>
+            <button onclick="checkAuthStatus()" class="btn btn-secondary">📊 Check Auth Status</button>
+            <button onclick="testAPI()" class="btn btn-secondary">🧪 Test API</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <h2>Authentication Status</h2>
+        <div class="status" id="auth-status">
+            <p>Click "Check Auth Status" to see your current authentication state</p>
+        </div>
+
+        <div class="divider"></div>
+
+        <h2>Troubleshooting Tips</h2>
+        <ul>
+            <li>Make sure you're accessing via <code>http://localhost:3000</code></li>
+            <li>Try clearing your browser cookies and cache</li>
+            <li>Try using an incognito/private browsing window</li>
+            <li>Check browser console (F12) for any errors</li>
+            <li>Ensure the backend server is running on port 3000</li>
+        </ul>
+
+        <div class="divider"></div>
+
+        <h2>Server Configuration</h2>
+        <pre>Backend URL: http://localhost:3000
+Auth Endpoint: http://localhost:3000/auth/google
+Callback URL: http://localhost:3000/auth/google/callback
+API Base: http://localhost:3000/api</pre>
+    </div>
+
+    <script>
+        async function checkAuthStatus() {
+            const statusDiv = document.getElementById('auth-status');
+            statusDiv.innerHTML = '<p class="info">Checking authentication status...</p>';
+
+            try {
+                const response = await fetch('/api/user', {
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (data.authenticated) {
+                    statusDiv.innerHTML = `
+                        <p class="success">✅ Authenticated</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        <a href="/auth/logout" class="btn">Logout</a>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <p class="error">❌ Not Authenticated</p>
+                        <p>You need to login first.</p>
+                        <a href="/auth/google" class="btn">Login with Google</a>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <p class="error">❌ Error checking status</p>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+
+        async function testAPI() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<p class="info">Testing API endpoints...</p>';
+
+            try {
+                // Test health endpoint
+                const healthResponse = await fetch('/api/health');
+                const healthData = await healthResponse.json();
+
+                // Test user endpoint
+                const userResponse = await fetch('/api/user', {
+                    credentials: 'include'
+                });
+                const userData = await userResponse.json();
+
+                statusDiv.innerHTML = `
+                    <p class="success">✅ API is working</p>
+                    <h3>Health Check:</h3>
+                    <pre>${JSON.stringify(healthData, null, 2)}</pre>
+                    <h3>User Status:</h3>
+                    <pre>${JSON.stringify(userData, null, 2)}</pre>
+                `;
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <p class="error">❌ API Error</p>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+
+        // Auto-check auth status on page load
+        window.addEventListener('load', checkAuthStatus);
+    </script>
+</body>
+</html>

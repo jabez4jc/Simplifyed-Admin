@@ -5,10 +5,17 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node --env-file=.env server.js",
     "dev": "nodemon server.js",
     "build": "echo 'No build process needed for backend'",
-    "test": "node --test",
+    "test": "node ../test/run-all-tests.js",
+    "test:api": "node ../test/api/test-core-api.js && node ../test/api/test-options-api.js",
+    "test:core": "node ../test/api/test-core-api.js",
+    "test:options": "node ../test/api/test-options-api.js",
+    "test:integration": "node ../test/integration/test-complete-workflow.js",
+    "test:ui": "node ../test/ui/test-dashboard-ui.js",
+    "test:ltp": "node ../test-ltp-api.js",
+    "test:expiry": "node ../test-options-expiry.js",
     "lint": "eslint --ext .js .",
     "setup": "npm install && echo 'Backend setup complete'",
     "db:check": "sqlite3 database/simplifyed.db '.tables'",
@@ -22,21 +29,27 @@
     "pm2:status": "pm2 status"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "helmet": "^7.1.0",
     "compression": "^1.7.4",
-    "morgan": "^1.10.0",
+    "connect-sqlite3": "^0.9.13",
+    "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "sqlite3": "^5.1.6",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.2.1",
+    "express-session": "^1.17.3",
+    "helmet": "^7.1.0",
+    "joi": "^18.0.1",
+    "lru-cache": "^11.2.2",
+    "morgan": "^1.10.0",
     "node-cron": "^3.0.3",
+    "nodemailer": "^7.0.10",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "express-session": "^1.17.3",
-    "connect-sqlite3": "^0.9.13"
+    "socket.io": "^4.8.1",
+    "sqlite3": "^5.1.6",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2",
-    "eslint": "^8.46.0"
+    "eslint": "^8.46.0",
+    "nodemon": "^3.0.2"
   }
 }

@@ -1,426 +1,520 @@
-# Simplifyed Admin Dashboard - Technical Documentation
+# CLAUDE.md
 
-## Overview
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-The Simplifyed Admin Dashboard is a comprehensive trading management system designed to monitor and control multiple OpenAlgo trading instances from a centralized interface. It provides real-time monitoring, automated safety controls, and comprehensive P&L tracking with role-based access control.
+## Project Overview
 
-## System Architecture
+Simplifyed Admin Dashboard is a comprehensive trading management system for monitoring and controlling multiple OpenAlgo trading instances. It provides real-time P&L tracking, watchlist management, automated risk controls, and a unified dashboard interface.
+
+**Tech Stack:**
+- Backend: Node.js 18+ with Express, ES6 modules
+- Database: SQLite
+- Frontend: Vanilla JavaScript (no frameworks)
+- Authentication: Google OAuth 2.0
+- UI: Tailwind CSS + Lucide Icons
+
+## Design Principles (S-Tier Trading Dashboard)
+
+### Core Design Philosophy
+- **Users First:** Prioritize trader needs, workflows, and ease of use. Trading decisions require clarity and speed.
+- **Meticulous Craft:** Precision and polish in every UI element. Financial data requires absolute accuracy.
+- **Speed & Performance:** Fast load times and snappy interactions. Every millisecond counts in trading.
+- **Simplicity & Clarity:** Clean, uncluttered interface. Market data must be unambiguous and immediately actionable.
+- **Focus & Efficiency:** Help traders achieve goals quickly with minimal friction. Reduce decision fatigue.
+- **Consistency:** Uniform design language across the entire dashboard. Financial interfaces require predictability.
+- **Accessibility (WCAG AA+):** Ensure sufficient contrast, keyboard navigation, and screen reader compatibility.
+- **Opinionated Design:** Clear, efficient default workflows for common trading tasks.
+
+### Design System Foundation
+
+**Color Palette:**
+- **Primary Brand Color:** Strategic use in CTAs and key highlights
+- **Neutrals:** Gray scale for text, backgrounds, borders (5-7 steps)
+- **Semantic Colors:**
+  - Success: Green (#10B981) - profits, successful orders, positive P&L
+  - Error/Destructive: Red (#EF4444) - losses, failed orders, negative P&L
+  - Warning: Amber (#F59E0B) - alerts, margin warnings, risk thresholds
+  - Informational: Blue (#3B82F6) - info, pending orders, neutral data
+- **Dark Mode:** Corresponding accessible palette for low-light trading environments
+
+**Typography:**
+- **Primary Font:** Inter or system-ui (clean, legible at small sizes)
+- **Scale:** H1 (32px), H2 (24px), H3 (20px), Body (16px), Small (14px), Caption (12px)
+- **Weights:** Regular (400), Medium (500), SemiBold (600), Bold (700)
+- **Line Height:** 1.5-1.7 for body text readability
+
+**Spacing:**
+- **Base Unit:** 8px
+- **Scale:** 4px, 8px, 12px, 16px, 24px, 32px, 48px, 64px
+
+**Border Radii:**
+- Small: 4-6px (inputs, buttons)
+- Medium: 8-12px (cards, modals)
+
+**Core UI Components:**
+- Buttons (primary, secondary, ghost, destructive, icon-only)
+- Input fields with clear labels, placeholders, validation states
+- Data tables with sorting, filtering, pagination
+- Cards for P&L widgets, positions, orders
+- Modals for trade confirmations and settings
+- Navigation (sidebar, tabs, breadcrumbs)
+- Status badges (profit, loss, pending, completed)
+- Tooltips for complex trading terms
+- Progress indicators for order execution
+
+### Layout & Visual Hierarchy
+
+**Dashboard Layout:**
+- **Persistent Left Sidebar:** Primary navigation (Dashboard, Watchlists, Orders, Positions, Instances)
+- **Content Area:** Module-specific interfaces with flexible grid
+- **Top Bar:** User profile, notifications, global search, connection status
+- **Responsive:** Mobile-friendly, but optimized for desktop trading
+
+**Visual Hierarchy for Trading Data:**
+- **P&L Prominence:** Total P&L highly visible, color-coded (green/red)
+- **Critical Alerts:** Warning states for margin calls, risk thresholds
+- **Data Density:** Efficient use of space for tables and lists
+- **Zebra Striping:** For order/position tables to improve scanability
+
+### Trading-Specific UI Guidelines
+
+**P&L Display:**
+- Real-time updates with smooth transitions
+- Large, prominent display of total P&L
+- Individual symbol P&L with clear positive/negative indicators
+- Percentage changes alongside absolute values
+
+**Order Management:**
+- Clear status indicators (pending, filled, cancelled)
+- Color-coded by status (blue/green/red/amber)
+- Quick action buttons (view, cancel) per row
+- Bulk actions for managing multiple orders
+
+**Watchlist Features:**
+- Visual symbol indicators (up/down arrows, percentage change)
+- Quick-add functionality with autocomplete
+- Color coding for price movements
+- Sortable columns (symbol, LTP, change, P&L)
+
+**Risk Indicators:**
+- Prominent display of risk metrics
+- Threshold warnings with clear visual cues
+- Margin status and available capital
+- Auto-switch mode status per instance
+
+### Interaction Design
+
+**Micro-interactions:**
+- Hover states on interactive elements (150-200ms)
+- Loading spinners for API calls
+- Smooth transitions for modal appearances
+- Immediate visual feedback for button clicks
+- Keyboard shortcuts for power users (e.g., Ctrl+K for search)
+
+**Real-time Updates:**
+- Subtle animations for live P&L changes
+- Blink/flash for significant price movements (optional, user-controlled)
+- Non-intrusive notifications for order updates
+- Progress indicators for order execution
+
+**Form Design:**
+- Clear validation messages
+- Auto-focus on first field
+- Smart defaults based on context
+- Inline help text for complex fields
+
+### CSS & Styling Architecture
+
+**Utility-First (Tailwind CSS):**
+```css
+/* Use utility classes for consistent spacing */
+.p-4 { padding: 1rem; }
+.mt-6 { margin-top: 1.5rem; }
+
+/* Semantic color classes */
+.text-profit { color: #10B981; }
+.text-loss { color: #EF4444; }
+.bg-profit-bg { background-color: rgba(16, 185, 129, 0.1); }
+```
+
+**Design Tokens in Tailwind Config:**
+```javascript
+colors: {
+  primary: { /* brand color */ },
+  neutral: { /* gray scale */ },
+  profit: '#10B981',
+  loss: '#EF4444',
+  warning: '#F59E0B',
+  info: '#3B82F6'
+}
+```
+
+**Component Patterns:**
+- Consistent card styling for widgets
+- Reusable button variants
+- Standardized form layouts
+- Modular table components
+
+### Best Practices
+
+**Data Display:**
+- Right-align numeric data for easy comparison
+- Use thousand separators for large numbers
+- Consistent decimal places for prices
+- Clear date/time formatting with timezone awareness
+
+**Performance:**
+- Virtual scrolling for large data sets
+- Debounced search inputs
+- Lazy loading for non-critical sections
+- Efficient re-renders (minimize DOM updates)
+
+**Accessibility:**
+- ARIA labels for all interactive elements
+- Keyboard navigation support
+- Screen reader announcements for critical updates
+- High contrast mode support
+- Focus indicators for all focusable elements
+
+**Error Handling:**
+- Clear error messages in plain language
+- Graceful degradation when APIs fail
+- Retry mechanisms for failed requests
+- Offline state indicators
+
+**Responsive Design:**
+- Mobile-first approach
+- Touch-friendly button sizes (44px minimum)
+- Collapsible sidebar on mobile
+- Horizontal scrolling for wide tables (with column prioritization)
+
+### Design Review Process
+
+Before merging UI changes:
+1. **Visual Polish:** Check spacing, alignment, typography
+2. **Responsive Design:** Test desktop (1440px), tablet (768px), mobile (375px)
+3. **Accessibility:** Verify keyboard navigation and contrast ratios
+4. **Trading Workflows:** Ensure common tasks remain fast and intuitive
+5. **Performance:** Check for janky animations or slow loading
+6. **Error States:** Test error handling and edge cases
+
+## Essential Development Commands
+
+### Backend (cd backend)
+```bash
+# Development
+npm start              # Start server
+npm run dev            # Start with nodemon auto-restart
+
+# Testing
+npm test               # Run all tests
+npm test -- test/pnl.test.js  # Run specific test file
+
+# Linting
+npm run lint           # Lint all JavaScript files
+
+# Database
+npm run db:check       # List database tables
+npm run db:schema      # Show database schema
+
+# Production (PM2)
+npm run pm2:start      # Start with PM2
+npm run pm2:stop       # Stop application
+npm run pm2:restart    # Restart
+npm run pm2:logs       # View logs
+npm run pm2:status     # Show PM2 status
+```
+
+## Architecture
 
 ```
-┌─────────────────────┐    ┌──────────────────┐
-│  Admin Dashboard    │────│   Backend API    │
-│  (Frontend - Vue)   │    │  (Node.js/Express) │
-└─────────────────────┘    └──────────────────┘
-                                      │
-                           ┌──────────────────┐
-                           │   SQLite DB      │
-                           │ - Instances      │
-                           │ - Users/Auth     │
-                           │ - P&L Data       │
-                           └──────────────────┘
-                                      │
-                           ┌──────────────────┐
-                           │ Scheduler/Workers│
-                           │ - 30s P&L polls  │
-                           │ - 20min health   │
-                           │ - Auto-switching │
-                           └──────────────────┘
-                                      │
-         ┌────────────────────────────┼────────────────────────────┐
-         │                            │                            │
-┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
-│  OpenAlgo #1    │          │  OpenAlgo #2    │          │  OpenAlgo #N    │
-│  (Upstox/Zerodha) │        │ (Flattrade/etc) │          │   (Any Broker)  │
-└─────────────────┘          └─────────────────┘          └─────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  frontend/ (Vanilla JS)                                    │
+│  ┌───────────────┐  ┌──────────────┐  ┌─────────────────┐ │
+│  │  Dashboard UI │  │  API Tester  │  │   Auth Tester   │ │
+│  │  (3,829 lines)│  │              │  │                 │ │
+│  └───────────────┘  └──────────────┘  └─────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│  backend/server.js (1,070 lines)                           │
+│  ┌──────────────┐ ┌──────────────┐ ┌────────────────────┐ │
+│  │ Auth (OAuth) │ │  WebSocket   │ │   Cron Jobs       │ │
+│  └──────────────┘ └──────────────┘ └────────────────────┘ │
+│                                                             │
+│  ┌──────────────┐ ┌──────────────┐ ┌────────────────────┐ │
+│  │   Routes (7) │ │   Lib (14)   │ │  Configuration     │ │
+│  │  - watchlist │ │  - pnl.js    │ │  - auth.js         │ │
+│  │  - orders    │ │  - account   │ │  - .env            │ │
+│  │  - positions │ │  - alert     │ │  - OAuth creds     │ │
+│  │  - symbols   │ │  - websocket │ │                    │ │
+│  │  - options   │ │  - order-*   │ │                    │ │
+│  │  - instance  │ │  - rate-limit│ │                    │ │
+│  │  - websocket │ │  - position  │ │                    │ │
+│  └──────────────┘ └──────────────┘ └────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│  SQLite Database                                            │
+│  ┌─────────────┐ ┌─────────────┐ ┌───────────────────────┐ │
+│  │ instances   │ │ watchlists  │ │ watchlist_symbols     │ │
+│  │ - P&L data  │ │ - metadata  │ │ - symbol config       │ │
+│  │ - config    │ │ - status    │ │ - trading rules       │ │
+│  │ - health    │ │             │ │                       │ │
+│  └─────────────┘ └─────────────┘ └───────────────────────┘ │
+│  ┌─────────────┐ ┌─────────────┐ ┌───────────────────────┐ │
+│  │ users       │ │ orders      │ │ rate_limits           │ │
+│  │ - auth      │ │ - tracking  │ │ - per-instance caps   │ │
+│  │ - roles     │ │ - history   │ │                       │ │
+│  └─────────────┘ └─────────────┘ └───────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│  External APIs                                              │
+│  ┌──────────────┐ ┌──────────────┐ ┌─────────────────────┐ │
+│  │  OpenAlgo    │ │  Market Data │ │    WebSocket        │ │
+│  │  /tradebook  │ │  Providers   │ │    Feeds            │ │
+│  │  /position   │ │              │ │                     │ │
+│  │  /orders     │ │              │ │                     │ │
+│  │  /ping       │ │              │ │                     │ │
+│  └──────────────┘ └──────────────┘ └─────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Key Features
+### Key Components
 
-### 1. **Comprehensive P&L Tracking**
-- **Realized P&L**: Calculated from completed trades (tradebook API)
-- **Unrealized P&L**: Calculated from open positions (positionbook API)
-- **Total P&L**: Combined realized + unrealized for complete view
-- **Real-time Updates**: 30-second polling for accurate data
+**Backend Server (server.js:1-1070)**
+- Express app with security middleware (helmet, cors, compression)
+- Google OAuth authentication with SQLite sessions
+- WebSocket support via Socket.IO
+- Cron jobs for health checks and P&L updates
+- Rate limiting per instance
 
-### 2. **Enhanced Dashboard Display**
-- **P&L Breakdown**: Shows R: ₹X | U: ₹Y format in Total P&L card
-- **Filtered Calculations**: Cumulative P&L for displayed instances only
-- **Instance Context**: Shows "X of Y instances" when filtering active
-- **Quick Decision Making**: Easy manual Safe-Switch decisions based on filtered P&L
+**Route Modules (routes/ directory)**
+- `watchlist.js` - CRUD for watchlists and symbol management
+- `orders.js` - Order tracking and management
+- `positions.js` - Position book and P&L
+- `symbols.js` - Symbol validation and search
+- `options.js` - Options trading features
+- `instance-config.js` - Instance management
+- `websocket-status.js` - WebSocket connectivity
 
-### 3. **Safe-Switch Workflow**
-- **Automated Switching**: Target-based profit/loss triggers
-- **Manual Override**: Quick manual switching with P&L context
-- **Safe Closure Process**: 
-  1. Close all positions
-  2. Cancel pending orders
-  3. Verify no open trades
-  4. Switch to analyzer mode
+**Business Logic (lib/ directory)**
+- `pnl.js` - Realized/unrealized P&L calculations
+- `account-pnl.js` - P&L aggregation from multiple sources
+- `order-placement-service.js` - Order execution logic
+- `order-status-tracker.js` - Real-time order monitoring
+- `websocket-manager.js` - WebSocket connection management
+- `rate-limiter.js` - Token bucket rate limiting
+- `alert-service.js` - Notification system
+- `position-manager.js` - Position tracking
+- `rule-evaluator.js` - Trading rule engine
+- `market-data-processor.js` - Data normalization
+- `options-trading-service.js` - Options-specific logic
+- `quantity-resolver-v2.js` - Position sizing
+- `openalgo-search.js` - Symbol search
 
-### 4. **Multi-Instance Management**
-- **Bulk Operations**: Control multiple instances simultaneously
-- **Individual Controls**: Instance-specific actions
-- **Search & Filter**: Find instances by broker, status, or name
-- **Health Monitoring**: Automatic health checks every 20 minutes
+**Frontend (public/)**
+- `dashboard.html` (1,547 lines) - Complete UI in single file
+- `dashboard.js` (3,829 lines) - All frontend logic
+- `api-explorer.html` - API testing tool
+- `test-auth.html` - Authentication testing
 
-### 5. **Security & Authentication**
-- **Google OAuth**: Secure authentication system
-- **Role-Based Access**: Admin and operator roles
-- **Session Management**: SQLite-based session storage
-- **API Key Encryption**: Encrypted storage of sensitive credentials
+## File Structure
 
-## Technology Stack
-
-### Backend
-- **Runtime**: Node.js v18+
-- **Framework**: Express.js
-- **Database**: SQLite with async/await support
-- **Authentication**: Passport.js with Google OAuth
-- **Session Storage**: connect-sqlite3
-- **Environment**: dotenv for configuration
-
-### Frontend
-- **Framework**: Vanilla JavaScript (no frameworks)
-- **Styling**: Tailwind CSS
-- **HTTP Client**: Fetch API
-- **Real-time Updates**: Polling-based updates
-- **UI Components**: Custom components with responsive design
-
-### External APIs
-- **OpenAlgo API**: RESTful API for trading operations
-- **Supported Endpoints**:
-  - `/api/v1/funds` - Account balance
-  - `/api/v1/tradebook` - Completed trades (for realized P&L)
-  - `/api/v1/positionbook` - Open positions (for unrealized P&L)
-  - `/api/v1/ping` - Health check
-  - `/api/v1/analyzer/toggle` - Mode switching
-  - `/api/v1/closeposition` - Close positions
-  - `/api/v1/cancelallorder` - Cancel orders
-
-## Database Schema
-
-### `instances` Table
-```sql
-CREATE TABLE instances (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  host TEXT NOT NULL,
-  api_key TEXT NOT NULL,
-  broker TEXT,
-  strategy_tag TEXT DEFAULT 'ALL',
-  is_analyzer_mode BOOLEAN DEFAULT 0,
-  current_balance REAL DEFAULT 0,
-  current_pnl REAL DEFAULT 0,
-  realized_pnl REAL DEFAULT 0,        -- NEW: From completed trades
-  unrealized_pnl REAL DEFAULT 0,      -- NEW: From open positions  
-  total_pnl REAL DEFAULT 0,           -- NEW: realized + unrealized
-  target_profit REAL DEFAULT 5000,
-  target_loss REAL DEFAULT 2000,
-  is_active BOOLEAN DEFAULT 1,
-  last_updated DATETIME,
-  health_status TEXT DEFAULT 'unknown',
-  last_health_check DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+```
+SimplifyedAdmin/
+├── backend/                      # Node.js backend
+│   ├── server.js                # Main server (1,070 lines)
+│   ├── auth.js                  # OAuth configuration
+│   ├── routes/                  # API endpoints (7 files)
+│   ├── lib/                     # Business logic (14 files)
+│   ├── public/                  # Frontend assets
+│   │   ├── dashboard.html       # UI (1,547 lines)
+│   │   ├── dashboard.js         # Frontend logic (3,829 lines)
+│   │   ├── api-explorer.html    # API testing tool
+│   │   └── test-auth.html       # Auth testing
+│   ├── test/                    # Test files (6 files)
+│   ├── database/                # SQLite DB files
+│   ├── package.json             # Dependencies & scripts
+│   └── .env                     # Environment config
+├── docs/                        # Comprehensive documentation
+│   ├── CLAUDE.md                # Full technical docs (643 lines)
+│   ├── API_QUICK_REFERENCE.md   # API endpoints
+│   ├── DATABASE_SCHEMA.md       # Database schema
+│   └── DEPLOYMENT.md            # Production deployment
+├── Requirements/                # System requirements docs
+└── README.md                    # Project overview
 ```
 
-### `users` Table
-```sql
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  email TEXT UNIQUE NOT NULL,
-  is_admin BOOLEAN DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+## Database Schema (SQLite)
+
+**Core Tables:**
+
+`instances` - Trading instance configurations and P&L
+- Stores: name, host, api_key, broker, strategy_tag
+- Financial: current_balance, realized_pnl, unrealized_pnl, total_pnl
+- Controls: target_profit, target_loss, is_analyzer_mode, is_active
+- Health: health_status, last_health_check
+
+`watchlists` - Watchlist metadata
+- id, name, description, is_active, timestamps
+
+`watchlist_symbols` - Symbol configurations per watchlist
+- watchlist_id (FK), exchange, symbol, token
+- Trading config: qty_type/value, target_type/value, sl_type/value
+- Rules: product_type, order_type, max_position_size
+
+`orders` - Order tracking and history
+- instance_id, order_id, symbol, side, quantity, price, status
+- metadata, timestamps
+
+`users` - Authentication and roles
+- email, is_admin, created_at
+
+## P&L Calculation
+
+**Realized P&L** (`lib/pnl.js:1-200`):
+```javascript
+// Groups trades by symbol, calculates avg buy/sell, computes closed P&L
+calculateRealizedPnL(trades) → { symbol: pnlAmount, ... }
+```
+
+**Unrealized P&L** (`lib/pnl.js:200-300`):
+```javascript
+// Maps position P&L directly from positionbook
+calculateUnrealizedPnL(positions) → { symbol: pnlAmount, ... }
+```
+
+**Total P&L** (`lib/account-pnl.js:1-100`):
+```javascript
+// Combines realized + unrealized for complete picture
+getAccountPnL(instance) → {
+  accountTotals: { realized_pnl, unrealized_pnl, total_pnl },
+  symbolBreakdown: { realizedPnL, unrealizedPnL }
+}
 ```
 
 ## API Endpoints
 
-### Instance Management
-- `GET /api/instances` - List all instances with comprehensive P&L data
-- `POST /api/instances` - Add new instance
-- `PUT /api/instances/:id` - Update instance configuration
-- `DELETE /api/instances/:id` - Remove instance
-
-### Trading Operations
-- `POST /api/instances/:id/analyzer-toggle` - Toggle analyzer/live mode
-- `POST /api/instances/:id/close-positions` - Close all positions
-- `POST /api/instances/:id/cancel-orders` - Cancel all pending orders
-- `POST /api/instances/:id/safe-switch` - Execute complete safe-switch workflow
-
-### Authentication
-- `GET /auth/google` - Initiate Google OAuth
+**Authentication:**
+- `GET /auth/google` - OAuth login
 - `GET /auth/google/callback` - OAuth callback
-- `GET /auth/logout` - Logout user
-- `GET /auth/unauthorized` - Unauthorized access page
+- `GET /api/user` - Current user
 
-## P&L Calculation Logic
+**Instances:**
+- `GET /api/instances` - List with P&L
+- `POST /api/instances` - Create
+- `PUT /api/instances/:id` - Update
+- `DELETE /api/instances/:id` - Remove
+- `POST /api/instances/:id/analyzer-toggle` - Toggle mode
+- `POST /api/instances/:id/safe-switch` - Safe switch workflow
 
-### Realized P&L Calculation
-```javascript
-// Groups trades by symbol and calculates profit/loss from completed trades
-function calculateRealizedPnL(trades) {
-  const grouped = {};
-  
-  // Group by symbol and aggregate buy/sell quantities and amounts
-  for (let trade of trades) {
-    const { symbol, action, price, quantity } = trade;
-    const parsedPrice = parseFloat(price);
-    const parsedQuantity = parseInt(quantity);
-    
-    if (!grouped[symbol]) {
-      grouped[symbol] = { buyQty: 0, buySum: 0, sellQty: 0, sellSum: 0 };
-    }
+**Watchlists:**
+- `GET /api/watchlists` - List all
+- `POST /api/watchlists` - Create
+- `PUT /api/watchlists/:id` - Update
+- `DELETE /api/watchlists/:id` - Delete
+- `POST /api/watchlists/:id/clone` - Clone
+- `GET /api/watchlists/:id/export` - CSV export
+- `POST /api/watchlists/:id/import` - CSV import
+- `POST /api/watchlists/:id/instances` - Assign instances
 
-    if (action === "BUY") {
-      grouped[symbol].buyQty += parsedQuantity;
-      grouped[symbol].buySum += parsedPrice * parsedQuantity;
-    } else if (action === "SELL") {
-      grouped[symbol].sellQty += parsedQuantity;
-      grouped[symbol].sellSum += parsedPrice * parsedQuantity;
-    }
-  }
+**Orders:**
+- `GET /api/orders` - List with filters
+- `GET /api/orders/:id` - Details
+- `POST /api/orders/:id/cancel` - Cancel
 
-  // Calculate realized P&L for each symbol
-  const realizedPnL = {};
-  for (let symbol in grouped) {
-    const g = grouped[symbol];
-    const avgBuy = g.buyQty ? g.buySum / g.buyQty : 0;
-    const avgSell = g.sellQty ? g.sellSum / g.sellQty : 0;
-    const closedQty = Math.min(g.buyQty, g.sellQty);
-    
-    realizedPnL[symbol] = (avgSell - avgBuy) * closedQty;
-  }
+**Positions:**
+- `GET /api/positions` - Get positions
+- `GET /api/positions/summary` - P&L summary
 
-  return realizedPnL;
-}
-```
+## Testing
 
-### Total P&L Integration
-```javascript
-// Complete P&L calculation combining realized and unrealized
-async function getAccountPnL(instance) {
-  // Get completed trades for realized P&L
-  const tradebookData = await makeOpenAlgoRequest(instance.host, '/api/v1/tradebook', {
-    apikey: instance.api_key
-  });
-  
-  // Get open positions for unrealized P&L
-  const positionsData = await makeOpenAlgoRequest(instance.host, '/api/v1/positionbook', {
-    apikey: instance.api_key
-  });
-  
-  // Calculate comprehensive P&L
-  const realizedPnL = calculateRealizedPnL(tradebookData.data || []);
-  const unrealizedPnL = calculateUnrealizedPnL(positionsData.data || []);
-  
-  const accountTotals = {
-    realized_pnl: Object.values(realizedPnL).reduce((sum, pnl) => sum + pnl, 0),
-    unrealized_pnl: Object.values(unrealizedPnL).reduce((sum, pnl) => sum + pnl, 0)
-  };
-  
-  accountTotals.total_pnl = accountTotals.realized_pnl + accountTotals.unrealized_pnl;
-  
-  return { accountTotals, symbolBreakdown: { realizedPnL, unrealizedPnL } };
-}
+**Test Framework:** Node.js built-in test runner (`node:test`)
+
+**Test Files:**
+- `test/pnl.test.js` - P&L calculation logic
+- `test/accountPnl.test.js` - P&L aggregation
+- `test/orderPlacementCapital.test.js` - Order placement
+- `test/symbolValidation.test.js` - Symbol validation
+- `test/marketDataProcessor.test.js` - Data processing
+- `test/updateInstances.test.js` - Instance updates
+
+**Run Tests:**
+```bash
+cd backend && npm test           # All tests
+npm test -- pnl.test.js          # Specific test
 ```
 
 ## Configuration
 
-### Environment Variables
-```bash
-# Server Configuration
+**Environment (backend/.env):**
+```env
+NODE_ENV=development
 PORT=3000
 BASE_URL=http://localhost:3000
-FRONTEND_URL=http://localhost:8080
-
-# Authentication
-SESSION_SECRET=your-session-secret-key
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-
-# Database
-NODE_ENV=development
+SESSION_SECRET=<required>
+GOOGLE_CLIENT_ID=<required>
+GOOGLE_CLIENT_SECRET=<required>
 ```
 
-### Google OAuth Setup
-1. Create project in Google Cloud Console
-2. Enable Google+ API
-3. Create OAuth 2.0 credentials
-4. Add authorized redirect URIs:
-   - `http://localhost:3000/auth/google/callback` (development)
-   - `https://yourdomain.com/auth/google/callback` (production)
-5. Download credentials JSON and place as `client_secret_SimplifyedAdmin.apps.googleusercontent.com.json`
+**Google OAuth:**
+- Place credentials as: `backend/client_secret_SimplifyedAdmin.apps.googleusercontent.com.json`
+- Redirect URIs:
+  - Development: `http://localhost:3000/auth/google/callback`
+  - Production: `https://yourdomain.com/auth/google/callback`
 
-## Installation & Setup
+## Key Implementation Details
 
-### Prerequisites
-- Node.js 18+
-- NPM or Yarn
-- Google OAuth credentials
+**Real-time Updates:**
+- Dashboard polling: 30-second intervals
+- Order tracking: 5-second intervals
+- Health checks: 20-minute intervals (cron)
 
-### Backend Setup
-```bash
-cd backend
-npm install
-# Configure environment variables
-cp .env.example .env
-# Add Google OAuth credentials file
-# Start server
-npm start
-```
+**Rate Limiting:**
+- Token bucket algorithm per instance
+- Configurable limits via `lib/rate-limiter.js:1-100`
+- Prevents API abuse
 
-### Frontend Setup
-```bash
-cd frontend
-# Serve static files (development)
-python3 -m http.server 8080
-# Or use any static file server
-```
+**Auto-Switch Logic:**
+- Monitors total_pnl against target_profit/target_loss
+- Safe closure process: close positions → cancel orders → toggle analyzer mode
+- Configurable per instance
 
-### Production Deployment
+**WebSocket Features:**
+- Real-time order updates
+- Instance health monitoring
+- Live P&L streaming (future enhancement)
 
-#### Automated Ubuntu Server Installation (Recommended)
+## Important Files for Development
 
-The fastest way to deploy on Ubuntu Server with custom domain and SSL:
+- **Server Entry:** `backend/server.js:1-100` - Express setup, middleware, routes
+- **Database Init:** `backend/server.js:96-150` - SQLite initialization
+- **Auth Setup:** `backend/auth.js:1-50` - Google OAuth configuration
+- **P&L Core:** `backend/lib/pnl.js:1-100` - Calculation functions
+- **Dashboard UI:** `backend/public/dashboard.html:1-200` - UI structure
+- **Frontend Logic:** `backend/public/dashboard.js:1-100` - State management
+- **Test Examples:** `backend/test/pnl.test.js:1-20` - Test patterns
 
-```bash
-# Download and run the installation script
-wget https://raw.githubusercontent.com/jabez4jc/Simplifyed-Admin/main/install-ubuntu.sh
-chmod +x install-ubuntu.sh
-sudo ./install-ubuntu.sh your-domain.com admin@yourdomain.com
-```
+## Documentation References
 
-**What the script configures:**
-- Node.js 18 + PM2 process manager
-- Nginx reverse proxy with security headers
-- SSL certificate via Let's Encrypt
-- UFW firewall configuration
-- Dedicated `simplifyed` user account
-- Auto-startup on system reboot
+For detailed information, see:
+- **Full Technical Docs:** `/docs/CLAUDE.md` (comprehensive 643-line guide)
+- **API Reference:** `/docs/API_QUICK_REFERENCE.md`
+- **Database Schema:** `/docs/DATABASE_SCHEMA.md`
+- **Deployment Guide:** `/docs/DEPLOYMENT.md`
+- **Project Overview:** `README.md`
 
-**File Locations:**
-- Application: `/opt/simplifyed-admin`
-- Nginx config: `/etc/nginx/sites-available/simplifyed-admin`
-- Environment: `/opt/simplifyed-admin/backend/.env`
-- OAuth setup: `/opt/simplifyed-admin/GOOGLE_OAUTH_SETUP.md`
+## Access Points
 
-#### Manual PM2 Deployment
+- **Dashboard:** http://localhost:3000/dashboard.html
+- **API Explorer:** http://localhost:3000/api-explorer.html
+- **Auth Tester:** http://localhost:3000/test-auth.html
 
-```bash
-# Backend (PM2 recommended)
-pm2 start server.js --name "simplifyed-backend"
-
-# Frontend (Nginx recommended)
-# Configure Nginx to serve static files and proxy API calls
-```
-
-#### Docker Deployment
-
-```dockerfile
-# Example Dockerfile structure
-FROM node:18-alpine
-WORKDIR /app
-COPY backend/ ./backend/
-COPY frontend/ ./frontend/
-RUN cd backend && npm ci --only=production
-EXPOSE 3000
-CMD ["npm", "start"]
-```
-
-## Monitoring & Maintenance
-
-### Health Checks
-- **Instance Health**: 20-minute intervals via `/ping` endpoint
-- **System Health**: Monitor logs for API errors and connection issues
-- **Database Health**: SQLite integrity checks recommended
-
-### Logging
-- **Request Logging**: All API requests logged with timestamps
-- **Error Logging**: Detailed error logs for debugging
-- **Authentication Events**: Login/logout events tracked
-
-### Performance Considerations
-- **API Rate Limits**: OpenAlgo instances may have rate limiting
-- **Database Optimization**: Consider indexing for large datasets
-- **Memory Management**: Monitor memory usage for long-running processes
-
-## Security Considerations
-
-### Data Protection
-- **API Keys**: Encrypted at rest in database
-- **Session Data**: Secure session management with SQLite storage
-- **HTTPS**: Required for production deployment
-- **CORS**: Configured for frontend domain only
-
-### Access Control
-- **Authentication Required**: All API endpoints require authentication
-- **Role-Based Access**: Admin vs operator permissions
-- **Session Expiry**: 7-day session timeout
-- **Unauthorized Access**: Proper error handling and redirects
-
-## Troubleshooting
-
-### Common Issues
-1. **Port Already in Use**: Kill existing processes on ports 3000/8080
-2. **Google OAuth Errors**: Verify credentials and redirect URIs
-3. **API Connection Failures**: Check OpenAlgo instance URLs and API keys
-4. **Database Lock Issues**: Ensure proper async/await usage
-
-### Debug Commands
-```bash
-# Check running processes
-lsof -i :3000
-lsof -i :8080
-
-# View logs
-tail -f logs/app.log
-
-# Database inspection
-sqlite3 database/trading.db
-.tables
-.schema instances
-```
-
-## Future Enhancements
-
-### Planned Features
-- **WebSocket Integration**: Real-time updates without polling
-- **Advanced Analytics**: Historical P&L charts and performance metrics
-- **Alert System**: Email/SMS notifications for critical events
-- **Backup & Recovery**: Automated database backups
-- **Multi-tenant Support**: Support multiple trading accounts per user
-
-### Scalability Improvements
-- **Database Migration**: PostgreSQL for production scale
-- **Caching Layer**: Redis for improved performance
-- **Load Balancing**: Multiple backend instances
-- **Microservices**: Split functionality into dedicated services
-
-## Development Guidelines
-
-### Code Standards
-- **ES6+ JavaScript**: Use modern JavaScript features
-- **Async/Await**: Prefer over callbacks and promises
-- **Error Handling**: Comprehensive try/catch blocks
-- **Logging**: Detailed logging for debugging and monitoring
-- **Comments**: Document complex business logic
-
-### Testing Strategy
-- **Unit Tests**: Core P&L calculation functions
-- **Integration Tests**: API endpoint testing
-- **E2E Tests**: Complete workflow testing
-- **Performance Tests**: Load testing for multiple instances
-
-### Version Control
-- **Git Flow**: Feature branches with pull request reviews
-- **Semantic Versioning**: Major.Minor.Patch versioning
-- **Release Notes**: Detailed changelog for each release
-- **Environment Branches**: Separate dev/staging/prod branches
+First login becomes admin automatically via `/backend/auth.js:200-250`.
 
 ---
 
-**Last Updated**: September 2025  
-**Version**: 2.0.0  
-**Maintainer**: Simplifyed Team  
-**Support**: support@simplifyed.in
+**Version:** 2.1.0
+**Last Updated:** November 2025

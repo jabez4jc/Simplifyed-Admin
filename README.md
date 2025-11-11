@@ -1,8 +1,8 @@
 # Simplifyed Admin Dashboard
 
-> **A comprehensive trading management system for monitoring and controlling multiple OpenAlgo instances with advanced P&L tracking and automated risk management.**
+> **A comprehensive trading management system for monitoring and controlling multiple OpenAlgo instances with advanced P&L tracking, watchlist management, and automated risk management.**
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/simplifyed/simplifyed-admin)
+[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/simplifyed/simplifyed-admin)
 [![Node.js](https://img.shields.io/badge/node.js-18%2B-green.svg)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -27,53 +27,109 @@
 - **Individual Controls**: Instance-specific trading actions
 - **Health Monitoring**: Automated health checks every 20 minutes
 
+### 📋 **Watchlist Management**
+- **Shared Watchlists**: Create and manage symbol watchlists across instances
+- **CSV Import/Export**: Bulk import/export symbols with configurations
+- **Instance Assignment**: Link watchlists to specific trading instances
+- **Symbol Configuration**: Per-symbol quantity rules, targets, stop-losses
+- **Active/Inactive Status**: Control watchlist activation state
+
 ### 🔐 **Enterprise Security**
 - **Google OAuth 2.0**: Secure authentication with role-based access
 - **Admin/Operator Roles**: Granular permission control
 - **Encrypted Storage**: API keys encrypted at rest
 - **Session Security**: Secure session management with SQLite storage
 
-### 🎨 **Modern Interface**
+### 🎨 **Unified Interface**
+- **Single Dashboard**: All features in one application
+- **Tab Navigation**: Easy switching between Instances and Watchlists
 - **Responsive Design**: Works seamlessly on desktop and mobile
-- **Real-time Dashboard**: Live updates with enhanced P&L display
-- **Search & Filters**: Quickly find and filter instances
-- **Table/Card Views**: Toggle between detailed table and card layouts
+- **Real-time Updates**: Live data with enhanced P&L display
+- **Dark Theme**: Modern, eye-friendly interface
 
 ## 📊 Dashboard Overview
 
-### Enhanced Total P&L Card
+The Simplifyed Admin Dashboard provides a unified interface with three main views:
+
+### 1. **Dashboard View**
 ```
-┌─────────────────────┐
-│    Total P&L        │
-│                     │
-│     +₹3,750         │
-│  R: +₹2,500 | U: +₹1,250  │
-│                     │
-│ (2 of 4 instances)  │ ← Shown when filtering
-└─────────────────────┘
+┌─────────────────────────────────────────┐
+│  Summary Cards                          │
+│  - Total Instances                      │
+│  - Active Instances                     │
+│  - Total P&L (with breakdown)           │
+│  - System Health                        │
+└─────────────────────────────────────────┘
 ```
 
-### Instance Management
-- **Live Mode**: Active trading with real-time P&L tracking
-- **Analyzer Mode**: Safe analysis mode with trade simulation
-- **Auto-Switching**: Intelligent switching based on P&L targets
-- **Manual Controls**: Override automation when needed
+### 2. **Instances View**
+```
+┌─────────────────────────────────────────┐
+│  Instance Management                    │
+│  ├─ P&L Tracking (Realized/Unrealized)  │
+│  ├─ Mode Toggle (Live/Analyzer)         │
+│  ├─ Position Management                 │
+│  ├─ Order Controls                      │
+│  └─ Health Status                       │
+└─────────────────────────────────────────┘
+```
+
+### 3. **Watchlists View**
+```
+┌─────────────────────────────────────────┐
+│  Watchlist Management                   │
+│  ├─ Create/Edit/Delete Watchlists       │
+│  ├─ Symbol Management                   │
+│  ├─ CSV Import/Export                   │
+│  ├─ Instance Assignment                 │
+│  └─ Configuration Rules                 │
+└─────────────────────────────────────────┘
+```
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────┐    ┌──────────────────┐    ┌─────────────────────┐
-│  Frontend Dashboard │────│   Backend API    │────│  OpenAlgo Instances │
-│  (Vue.js + Tailwind)│    │ (Node.js/Express)│    │  (Multiple Brokers) │
-└─────────────────────┘    └──────────────────┘    └─────────────────────┘
-                                      │
-                           ┌──────────────────┐
-                           │   SQLite DB      │
-                           │ • Instances      │
-                           │ • Users/Roles    │
-                           │ • P&L Data       │
-                           │ • Health Logs    │
-                           └──────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                  Unified Admin Dashboard                     │
+│         (Single HTML/JS Application - No Framework)          │
+│  ┌──────────────────┐  ┌───────────────────────────────┐   │
+│  │    Instances     │  │       Watchlists              │   │
+│  │  - P&L Tracking  │  │  - Symbol Management          │   │
+│  │  - Mode Control  │  │  - CSV Import/Export          │   │
+│  │  - Health Check  │  │  - Instance Assignment        │   │
+│  └──────────────────┘  └───────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ HTTP/REST API
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│                   Backend API Server                         │
+│                  (Node.js + Express)                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐   │
+│  │  Instance   │  │  Watchlist  │  │   Order Tracking │   │
+│  │   Routes    │  │   Routes    │  │     (Phase 4)    │   │
+│  └─────────────┘  └─────────────┘  └──────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│                     SQLite Database                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐   │
+│  │  instances  │  │  watchlists │  │ watchlist_symbols│   │
+│  │    users    │  │  sessions   │  │ watchlist_orders │   │
+│  └─────────────┘  └─────────────┘  └──────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ OpenAlgo API
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│              OpenAlgo Trading Instances                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │  Instance #1 │  │  Instance #2 │  │  Instance #N │     │
+│  │   (Upstox)   │  │ (Flattrade)  │  │  (Any Broker)│     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## 🚀 Quick Start
@@ -106,49 +162,52 @@ Create `.env` in `backend/` directory:
 NODE_ENV=development
 PORT=3000
 BASE_URL=http://localhost:3000
-FRONTEND_URL=http://localhost:8080
 SESSION_SECRET=your-super-secret-session-key-here
 ```
 
 ### 4. Launch Application
 ```bash
-# Start backend server
-cd backend && npm start
-
-# Start frontend server (in new terminal)
-cd frontend && python3 -m http.server 8080
+# Start backend server (from backend directory)
+npm start
 ```
 
 ### 5. Access Dashboard
-- **Frontend**: http://localhost:8080
-- **Backend API**: http://localhost:3000/api
+- **Dashboard URL**: http://localhost:3000/dashboard.html
 - **Login**: Click "Login with Google" button
+- **First Login**: First user becomes admin automatically
 
 ## 📁 Project Structure
 
 ```
 SimplifyedAdmin/
-├── 📁 backend/                     # Node.js Express backend
-│   ├── 🚀 server.js               # Main server with P&L engine
-│   ├── 🔐 auth.js                 # Google OAuth & role management
-│   ├── 📦 package.json            # Backend dependencies
-│   ├── ⚙️ ecosystem.config.js     # PM2 production config
-│   └── 📁 database/               # SQLite databases
-│       ├── 🗄️ trading.db          # Main application data
-│       └── 🔑 sessions.db         # Authentication sessions
-├── 📁 frontend/                   # Modern dashboard interface
-│   ├── 🏠 index.html             # Main dashboard UI
-│   ├── ⚡ app.js                 # Enhanced frontend logic
-│   └── 🎨 styles/                # Custom styling
-├── 📁 Requirements/               # System documentation
-│   ├── 📋 Simplifyed System Architecture — Diagram.txt
-│   └── 📚 openalgo-api-docs.md
-├── 📄 CLAUDE.md                  # Complete technical documentation
-├── 🗄️ DATABASE_SCHEMA.md         # Database schema documentation
-├── 🚀 DEPLOYMENT.md              # Production deployment guide
-├── ⚙️ install-ubuntu.sh          # Automated Ubuntu installation script
-├── 🙈 .gitignore                 # Security-focused git ignore
-└── 📖 README.md                  # This file
+├── 📁 backend/                         # Node.js Express backend
+│   ├── 🚀 server.js                   # Main server with all APIs
+│   ├── 🔐 auth.js                     # Google OAuth & sessions
+│   ├── 📁 routes/                     # API route handlers
+│   │   ├── instances.js               # Instance management
+│   │   ├── watchlists.js              # Watchlist management
+│   │   ├── orders.js                  # Order tracking (Phase 4)
+│   │   └── health.js                  # Health checks
+│   ├── 📁 lib/                        # Business logic
+│   │   ├── order-status-tracker.js    # Order polling
+│   │   ├── order-placement-service.js # Order execution
+│   │   └── rate-limiter.js            # API rate limiting
+│   ├── 📁 database/                   # SQLite databases
+│   │   ├── 🗄️ simplifyed.db          # Main application data
+│   │   ├── 🔑 sessions.db             # Authentication sessions
+│   │   └── 📁 migrations/             # Database migrations
+│   ├── 📁 public/                     # Static frontend files
+│   │   ├── 🏠 dashboard.html          # Unified dashboard UI
+│   │   ├── ⚡ dashboard.js            # All frontend logic
+│   │   ├── 🔧 api-explorer.html       # API testing tool
+│   │   └── 🧪 test-auth.html          # Auth testing tool
+│   └── 📦 package.json                # Backend dependencies
+├── 📁 Requirements/                   # System documentation
+├── 📄 CLAUDE.md                       # Technical documentation
+├── 🗄️ DATABASE_SCHEMA.md             # Database schema docs
+├── 🚀 DEPLOYMENT.md                   # Production deployment guide
+├── ⚙️ install-ubuntu.sh               # Automated Ubuntu installer
+└── 📖 README.md                       # This file
 ```
 
 ## 🎛️ Advanced Configuration
@@ -159,7 +218,6 @@ SimplifyedAdmin/
 | `NODE_ENV` | Environment mode | `development` |
 | `PORT` | Backend server port | `3000` |
 | `BASE_URL` | Backend base URL | `http://localhost:3000` |
-| `FRONTEND_URL` | Frontend URL for redirects | `http://localhost:8080` |
 | `SESSION_SECRET` | Session encryption key | Required |
 
 ### Instance Configuration
@@ -167,14 +225,25 @@ Each OpenAlgo instance requires:
 - **Name**: Descriptive instance name
 - **Host URL**: OpenAlgo instance URL (e.g., https://upstox.simplifyed.in)
 - **API Key**: OpenAlgo API authentication key
-- **Broker**: Broker type (upstox, flattrade, etc.)
+- **Broker**: Broker type (upstox, flattrade, zerodha, etc.)
 - **Strategy Tag**: Trading strategy identifier
 - **Profit Target**: Auto-switch profit threshold (default: ₹5,000)
 - **Loss Target**: Auto-switch loss threshold (default: ₹2,000)
 
-## 📊 Database Schema (v2.0)
+### Watchlist Configuration
+Each watchlist supports:
+- **Name & Description**: Identification metadata
+- **Active Status**: Enable/disable watchlist
+- **Symbol List**: Multiple symbols with configurations
+- **Instance Assignment**: Link to specific instances
+- **CSV Import/Export**: Bulk symbol management
 
-### Enhanced Instances Table
+## 📊 Database Schema (v2.1)
+
+### Core Tables
+
+#### **instances**
+Stores OpenAlgo instance configurations and real-time P&L data.
 ```sql
 CREATE TABLE instances (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,19 +252,19 @@ CREATE TABLE instances (
   api_key TEXT NOT NULL,
   broker TEXT,
   strategy_tag TEXT DEFAULT 'ALL',
-  
+
   -- Financial Tracking
   current_balance REAL DEFAULT 0,
-  realized_pnl REAL DEFAULT 0,        -- 🆕 From completed trades
-  unrealized_pnl REAL DEFAULT 0,      -- 🆕 From open positions
-  total_pnl REAL DEFAULT 0,           -- 🆕 Combined P&L
-  
+  realized_pnl REAL DEFAULT 0,        -- From completed trades
+  unrealized_pnl REAL DEFAULT 0,      -- From open positions
+  total_pnl REAL DEFAULT 0,           -- Combined P&L
+
   -- Risk Management
   target_profit REAL DEFAULT 5000,
   target_loss REAL DEFAULT 2000,
   is_analyzer_mode BOOLEAN DEFAULT 0,
   is_active BOOLEAN DEFAULT 1,
-  
+
   -- Health & Audit
   health_status TEXT DEFAULT 'unknown',
   last_health_check DATETIME,
@@ -204,15 +273,68 @@ CREATE TABLE instances (
 );
 ```
 
-### Users & Roles
+#### **watchlists**
+Stores watchlist metadata and configuration.
+```sql
+CREATE TABLE watchlists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  description TEXT,
+  is_active BOOLEAN DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### **watchlist_symbols**
+Stores symbols and their trading configurations.
+```sql
+CREATE TABLE watchlist_symbols (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  watchlist_id INTEGER NOT NULL,
+  exchange TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  token TEXT,
+  -- Trading Configuration
+  qty_type TEXT DEFAULT 'FIXED',
+  qty_value REAL DEFAULT 1,
+  target_type TEXT DEFAULT 'PERCENTAGE',
+  target_value REAL DEFAULT 0,
+  sl_type TEXT DEFAULT 'PERCENTAGE',
+  sl_value REAL DEFAULT 0,
+  product_type TEXT DEFAULT 'MIS',
+  order_type TEXT DEFAULT 'MARKET',
+  is_enabled BOOLEAN DEFAULT 1,
+  FOREIGN KEY (watchlist_id) REFERENCES watchlists(id) ON DELETE CASCADE
+);
+```
+
+#### **watchlist_instance_assignments**
+Links watchlists to instances.
+```sql
+CREATE TABLE watchlist_instance_assignments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  watchlist_id INTEGER NOT NULL,
+  instance_id INTEGER NOT NULL,
+  assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (watchlist_id) REFERENCES watchlists(id) ON DELETE CASCADE,
+  FOREIGN KEY (instance_id) REFERENCES instances(id) ON DELETE CASCADE,
+  UNIQUE(watchlist_id, instance_id)
+);
+```
+
+#### **users**
+Stores user authentication and roles.
 ```sql
 CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,
-  is_admin BOOLEAN DEFAULT 0,         -- Role-based access
+  is_admin BOOLEAN DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
+
+See [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for complete schema documentation including Phase 3 & 4 tables.
 
 ## 🔌 API Endpoints
 
@@ -223,48 +345,60 @@ CREATE TABLE users (
 | `GET` | `/auth/google` | Initiate Google OAuth login |
 | `GET` | `/auth/google/callback` | OAuth callback handler |
 | `GET` | `/auth/logout` | Logout and clear session |
-| `GET` | `/auth/unauthorized` | Unauthorized access page |
 
 ### Instance Management
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/instances` | List all instances with comprehensive P&L |
+| `GET` | `/api/instances` | List all instances with P&L |
 | `POST` | `/api/instances` | Create new trading instance |
 | `PUT` | `/api/instances/:id` | Update instance configuration |
 | `DELETE` | `/api/instances/:id` | Remove instance |
+| `POST` | `/api/instances/:id/analyzer-toggle` | Toggle live/analyzer mode |
+| `POST` | `/api/instances/:id/close-positions` | Close all positions |
+| `POST` | `/api/instances/:id/cancel-orders` | Cancel pending orders |
+| `POST` | `/api/instances/:id/safe-switch` | Execute safe-switch workflow |
 
-### Trading Operations
+### Watchlist Management
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/instances/:id/analyzer-toggle` | Switch between live/analyzer mode |
-| `POST` | `/api/instances/:id/close-positions` | Close all open positions |
-| `POST` | `/api/instances/:id/cancel-orders` | Cancel all pending orders |
-| `POST` | `/api/instances/:id/safe-switch` | Execute complete safe-switch workflow |
+| `GET` | `/api/watchlists` | List all watchlists |
+| `GET` | `/api/watchlists/:id` | Get watchlist with details |
+| `POST` | `/api/watchlists` | Create new watchlist |
+| `PUT` | `/api/watchlists/:id` | Update watchlist metadata |
+| `DELETE` | `/api/watchlists/:id` | Delete watchlist |
+| `POST` | `/api/watchlists/:id/clone` | Clone watchlist |
+| `GET` | `/api/watchlists/:id/export` | Export CSV |
+| `POST` | `/api/watchlists/:id/import` | Import CSV (append/replace) |
+| `POST` | `/api/watchlists/:id/instances` | Assign instances |
+| `DELETE` | `/api/watchlists/:id/instances/:iid` | Remove instance |
+
+### Order Tracking (Phase 4)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/orders` | List orders with filters |
+| `GET` | `/api/orders/:id` | Get order details |
+| `POST` | `/api/orders/:id/cancel` | Cancel order |
+| `GET` | `/api/orders/stats/summary` | Order statistics |
+
+See [API_QUICK_REFERENCE.md](API_QUICK_REFERENCE.md) for complete API documentation.
 
 ## ⚡ P&L Calculation Engine
 
 ### Comprehensive P&L Tracking
-The system calculates three types of P&L for complete visibility:
+The system calculates three types of P&L:
 
-1. **Realized P&L** (from tradebook)
-   ```javascript
-   // Groups completed trades by symbol
-   // Calculates average buy/sell prices
-   // Computes profit/loss for closed positions
-   realizedPnL = (avgSellPrice - avgBuyPrice) * closedQuantity
-   ```
+1. **Realized P&L** (from tradebook API)
+   - Groups completed trades by symbol
+   - Calculates average buy/sell prices
+   - Computes profit/loss for closed positions
 
-2. **Unrealized P&L** (from positionbook)
-   ```javascript
-   // Extracts P&L from open positions
-   // Current market value vs average cost
-   unrealizedPnL = (currentPrice - avgPrice) * quantity
-   ```
+2. **Unrealized P&L** (from positionbook API)
+   - Extracts P&L from open positions
+   - Current market value vs average cost
 
 3. **Total P&L** (combined)
-   ```javascript
-   totalPnL = realizedPnL + unrealizedPnL
-   ```
+   - Sum of realized and unrealized P&L
+   - Displayed with breakdown: `+₹3,750 (R: +₹2,500 | U: +₹1,250)`
 
 ### Auto-Switch Logic
 ```javascript
@@ -274,17 +408,13 @@ if (totalPnL >= targetProfit && !isAnalyzerMode) {
   // 3. Switch to analyzer mode
   // 4. Log the action
 }
-
-if (totalPnL <= -targetLoss && !isAnalyzerMode) {
-  // Same safe-switch process for loss protection
-}
 ```
 
 ## 🚀 Production Deployment
 
 ### 🖥️ Automated Ubuntu Server Installation (Recommended)
 
-The easiest way to deploy Simplifyed Admin Dashboard on Ubuntu Server with custom domain and SSL certificate:
+Deploy on Ubuntu Server with custom domain and SSL:
 
 ```bash
 # Download and run the installation script
@@ -293,78 +423,37 @@ chmod +x install-ubuntu.sh
 sudo ./install-ubuntu.sh your-domain.com admin@yourdomain.com
 ```
 
-**What the script does:**
-- ✅ Installs Node.js 18, PM2, Nginx, and all dependencies
-- ✅ Creates dedicated user account (`simplifyed`)
-- ✅ Configures Nginx reverse proxy with security headers
-- ✅ Sets up SSL certificate with Let's Encrypt
-- ✅ Configures UFW firewall with proper rules
-- ✅ Starts services and enables auto-startup
-- ✅ Creates Google OAuth setup instructions
-
-**Requirements:**
-- Ubuntu Server 20.04+ with root access
-- Domain name pointing to your server IP
-- Ports 80 and 443 open
+**What the script configures:**
+- ✅ Node.js 18 + PM2 process manager
+- ✅ Nginx reverse proxy with security headers
+- ✅ SSL certificate via Let's Encrypt
+- ✅ UFW firewall configuration
+- ✅ Dedicated `simplifyed` user account
+- ✅ Auto-startup on system reboot
 
 **Post-Installation:**
-1. Set up Google OAuth credentials (instructions provided)
-2. Access dashboard at `https://your-domain.com`
-3. First login becomes admin automatically
+1. Configure Google OAuth credentials
+2. Access dashboard at `https://your-domain.com/dashboard.html`
+3. First login becomes admin
 
-### Using PM2 (Manual Setup)
+### Manual PM2 Deployment
 ```bash
 # Install PM2 globally
 npm install -g pm2
 
 # Start application
-cd backend && npm run pm2:start
+cd backend && pm2 start server.js --name simplifyed-backend
 
-# Monitor processes
+# Monitor
 pm2 status
 pm2 logs simplifyed-backend
 
-# Auto-start on system reboot
+# Auto-start on reboot
 pm2 startup
 pm2 save
 ```
 
-### Production Environment
-```env
-NODE_ENV=production
-PORT=3000
-BASE_URL=https://your-domain.com
-FRONTEND_URL=https://your-domain.com
-SESSION_SECRET=your-super-secure-production-secret
-```
-
-### Nginx Configuration
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    
-    # Frontend static files
-    location / {
-        root /path/to/SimplifyedAdmin/frontend;
-        try_files $uri $uri/ /index.html;
-    }
-    
-    # Backend API proxy
-    location /api/ {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-    
-    # Authentication routes
-    location /auth/ {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+See [DEPLOYMENT.md](DEPLOYMENT.md) for complete deployment documentation.
 
 ## 🔧 Management Commands
 
@@ -372,8 +461,6 @@ server {
 ```bash
 npm start              # Start backend server
 npm run dev           # Start with nodemon auto-restart
-npm run test          # Run test suite
-npm run lint          # Check code quality
 ```
 
 ### Production (PM2)
@@ -382,15 +469,12 @@ npm run pm2:start     # Start with PM2
 npm run pm2:stop      # Stop application
 npm run pm2:restart   # Restart application
 npm run pm2:logs      # View logs
-npm run pm2:delete    # Remove from PM2
-npm run pm2:monitor   # Open PM2 web dashboard
 ```
 
 ### Database
 ```bash
-npm run db:backup     # Create database backup
-npm run db:migrate    # Run database migrations
-npm run db:seed       # Seed sample data
+node database/migrate.js up      # Run migrations
+node database/migrate.js down    # Rollback migrations
 ```
 
 ## 🛡️ Security Features
@@ -398,128 +482,65 @@ npm run db:seed       # Seed sample data
 ### Authentication & Authorization
 - **Google OAuth 2.0**: Enterprise-grade authentication
 - **Role-based Access**: Admin and operator permissions
-- **Session Security**: Secure session storage with expiration
-- **CSRF Protection**: Request validation and CSRF tokens
+- **Session Security**: Secure SQLite session storage
+- **First-User Admin**: First login automatically becomes admin
 
 ### Data Protection
-- **API Key Encryption**: AES-256 encryption for stored API keys
+- **API Key Encryption**: Secure storage of sensitive credentials
 - **TLS/HTTPS**: Encrypted communication in production
-- **Input Validation**: Comprehensive input sanitization
+- **Input Validation**: Comprehensive request validation
 - **SQL Injection Protection**: Parameterized queries
-
-### Security Headers
-```javascript
-// Implemented security headers
-helmet({
-  contentSecurityPolicy: true,
-  hsts: true,
-  noSniff: true,
-  frameguard: true,
-  xssFilter: true
-})
-```
 
 ## 📈 Monitoring & Health Checks
 
-### System Health
 - **Instance Health**: 20-minute health check intervals
 - **API Connectivity**: Continuous endpoint monitoring
-- **Database Health**: Connection and integrity checks
-- **Performance Metrics**: Response time tracking
-
-### Logging & Alerts
-- **Request Logging**: All API requests with timestamps
-- **Error Tracking**: Comprehensive error logging
-- **P&L Events**: Automated switching events logged
-- **Health Alerts**: Automated notifications for failures
+- **Database Health**: Connection integrity checks
+- **Order Status Tracking**: 5-second polling for order updates
 
 ## 🔍 Troubleshooting
 
 ### Common Issues
 
-#### 1. Authentication Problems
+#### Authentication Problems
 ```bash
 # Check Google OAuth credentials
 ls backend/client_secret_*.json
 
-# Verify redirect URIs in Google Cloud Console
-# Ensure URLs match exactly (including http/https)
+# Verify environment variables
+cat backend/.env
 ```
 
-#### 2. Database Issues
+#### Database Issues
 ```bash
-# Check database permissions
-ls -la backend/database/
+# Check database
+sqlite3 backend/database/simplifyed.db ".tables"
 
-# Test database connectivity
-sqlite3 backend/database/trading.db ".tables"
-
-# Backup before troubleshooting
-npm run db:backup
+# Run migrations
+cd backend && node database/migrate.js up
 ```
 
-#### 3. OpenAlgo Connection
-```bash
-# Test API connectivity
-curl -X POST https://your-openalgo-instance.com/api/v1/ping \
-  -H "Content-Type: application/json" \
-  -d '{"apikey": "your-api-key"}'
-```
-
-#### 4. Port Conflicts
+#### Port Conflicts
 ```bash
 # Check port usage
 lsof -i :3000
-lsof -i :8080
 
-# Kill conflicting processes
+# Kill process
 kill -9 <process-id>
-```
-
-### Debug Mode
-```bash
-# Enable debug logging
-DEBUG=* npm start
-
-# Backend only debug
-DEBUG=simplifyed:* npm start
 ```
 
 ## 📚 Documentation
 
 - **[CLAUDE.md](CLAUDE.md)**: Complete technical documentation
 - **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)**: Database schema and migrations
-- **[DEPLOYMENT.md](DEPLOYMENT.md)**: Production deployment guide with Ubuntu installer
-- **[Requirements/](Requirements/)**: System architecture and API documentation
-- **[OpenAlgo API Docs](Requirements/openalgo-api-docs.md)**: OpenAlgo integration guide
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
-
-### Development Setup
-```bash
-# Clone your fork
-git clone https://github.com/your-username/SimplifyedAdmin.git
-
-# Add upstream remote
-git remote add upstream https://github.com/original-org/SimplifyedAdmin.git
-
-# Create development branch
-git checkout -b develop
-```
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- **[DEPLOYMENT.md](DEPLOYMENT.md)**: Production deployment guide
+- **[API_QUICK_REFERENCE.md](API_QUICK_REFERENCE.md)**: API endpoint reference
+- **[Requirements/](Requirements/)**: System architecture and requirements
 
 ## 🏷️ Version History
 
-- **v2.0.0** (September 2025) - Comprehensive P&L tracking, enhanced UI, advanced risk management
+- **v2.1.0** (November 2025) - Unified dashboard with watchlist management integrated
+- **v2.0.0** (September 2025) - Comprehensive P&L tracking, enhanced UI
 - **v1.5.0** - Multi-instance management, health monitoring
 - **v1.0.0** - Initial release with basic OpenAlgo integration
 
@@ -528,7 +549,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Documentation**: [Complete Technical Docs](CLAUDE.md)
 - **Issues**: [GitHub Issues](https://github.com/your-org/SimplifyedAdmin/issues)
 - **Email**: support@simplifyed.in
-- **Discord**: [Trading Community](https://discord.gg/simplifyed)
 
 ---
 

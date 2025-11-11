@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simplifyed Trading Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .loading { opacity: 0.5; pointer-events: none; }
+        .card-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+        .table-view { display: table; width: 100%; }
+        .slide-enter { transform: translateY(-20px); opacity: 0; }
+        .slide-enter-active { transform: translateY(0); opacity: 1; transition: all 0.3s ease; }
+        .modal { display: none; }
+        .modal.active { display: flex; }
+        .animate-pulse-slow { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .status-live { background: linear-gradient(135deg, #10b981, #059669); }
+        .status-analyzer { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .view-btn {
+            color: #94a3b8;
+            background-color: transparent;
+        }
+        .view-btn.active {
+            color: #f8fafc;
+            background-color: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        .view-btn:hover:not(.active) {
+            color: #e2e8f0;
+            background-color: rgba(71, 85, 105, 0.3);
+        }
+
+        /* Toast styles */
+        .toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 min-h-screen">
+
+    <!-- Loading Overlay Container -->
+    <div id="loading"></div>
+
+    <!-- Login Page Container -->
+    <div id="login-page" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4"></div>
+
+    <!-- Skip to main content link -->
+    <a href="#main-content" class="skip-link">
+        Skip to main content
+    </a>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="hidden">
+        <!-- Mobile Sidebar Overlay -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-slate-950/50 z-40 md:hidden hidden" onclick="toggleSidebar()"></div>
+
+        <!-- Navigation Sidebar Container -->
+        <nav id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-slate-800/50 backdrop-blur-xl border-r border-slate-700/50 p-6 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out"></nav>
+
+        <!-- Main Content -->
+        <main id="main-content" class="ml-0 md:ml-64 min-h-screen">
+            <div id="main-header" class="hidden md:block bg-slate-800/30 backdrop-blur-sm border-b border-slate-700/50 p-4">
+                <div class="flex items-center justify-between">
+                    <button id="mobile-menu-btn" class="md:hidden p-2 text-white hover:bg-slate-700/50 rounded-lg" onclick="toggleSidebar()" aria-label="Toggle navigation">
+                        <i data-lucide="menu" class="w-6 h-6"></i>
+                    </button>
+                    <div class="flex-1"></div>
+                    <div class="flex items-center space-x-4">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="auto-refresh-toggle" class="rounded text-blue-500" checked>
+                            <span class="text-slate-300 text-sm">Auto-refresh</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Content Container -->
+            <div id="dashboard-content"></div>
+        </main>
+    </div>
+
+    <!-- Modals Container (Keep inline for complex dynamic content) -->
+    <div id="modals-container"></div>
+
+    <!-- Component System Scripts -->
+    <script type="module">
+        import ComponentFactory from './components/ComponentFactory.js';
+
+        // Make ComponentFactory globally available
+        window.ComponentFactory = ComponentFactory;
+
+        // Initialize components on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            ComponentFactory.initializeCommon();
+        });
+    </script>
+
+    <!-- Dashboard Logic (to be refactored into components) -->
+    <script src="dashboard.js"></script>
+</body>
+</html>

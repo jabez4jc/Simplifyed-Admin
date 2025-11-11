@@ -1,0 +1,3 @@
+exchange,symbol,qty_type,qty_value,target_type,target_value,sl_type,sl_value,ts_type,ts_value,product_type,order_type,max_position_size,max_instances,is_enabled
+NFO,NIFTY25NOV25FUT,FIXED,3,,,,,,,MIS,MARKET,,,1
+NFO,BANKNIFTY25NOV25FUT,FIXED,1,,,,,,,MIS,MARKET,,,1
