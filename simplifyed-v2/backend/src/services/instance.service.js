@@ -449,24 +449,37 @@ class InstanceService {
       };
 
       // Call ping endpoint to test connection and get broker name
-      const pingResponse = await openalgoClient.ping(tempInstance);
+      // Note: ping() already returns response.data, not the full response
+      const pingData = await openalgoClient.ping(tempInstance);
 
-      if (pingResponse && pingResponse.data && pingResponse.data.broker) {
+      log.debug('Ping response received', {
+        host_url: tempInstance.host_url,
+        pingData,
+      });
+
+      // Check for broker in the response (pingData is already response.data)
+      if (pingData && pingData.broker) {
         log.info('Connection test successful', {
           host_url: tempInstance.host_url,
-          broker: pingResponse.data.broker,
+          broker: pingData.broker,
         });
 
         return {
           success: true,
-          broker: pingResponse.data.broker,
-          message: pingResponse.data.message || 'Connection successful',
+          broker: pingData.broker,
+          message: pingData.message || 'Connection successful',
         };
       }
 
+      // Log the full response to help debug
+      log.warn('Broker information not found in ping response', {
+        host_url: tempInstance.host_url,
+        pingData,
+      });
+
       return {
         success: false,
-        message: 'Ping successful but broker information not found',
+        message: 'Ping successful but broker information not found in response',
       };
     } catch (error) {
       log.warn('Connection test failed', { error: error.message });
@@ -500,9 +513,15 @@ class InstanceService {
       };
 
       // Call funds endpoint to validate API key
-      const fundsResponse = await openalgoClient.getFunds(tempInstance);
+      // Note: getFunds() already returns response.data, not the full response
+      const fundsData = await openalgoClient.getFunds(tempInstance);
 
-      if (fundsResponse && fundsResponse.data) {
+      log.debug('Funds response received', {
+        host_url: tempInstance.host_url,
+        fundsData,
+      });
+
+      if (fundsData) {
         log.info('API key test successful', {
           host_url: tempInstance.host_url,
         });
@@ -510,7 +529,7 @@ class InstanceService {
         return {
           success: true,
           message: 'API key is valid',
-          funds: fundsResponse.data,
+          funds: fundsData,
         };
       }
 
