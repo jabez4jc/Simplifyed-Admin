@@ -212,8 +212,11 @@ app.use(express.static(join(__dirname, 'public')));
 // Setup auth routes
 setupAuthRoutes(app);
 
-// Make dbAsync available to routes
+// Make dbAsync and utility functions available to routes
 app.locals.dbAsync = dbAsync;
+app.locals.normalizeHostUrl = normalizeHostUrl;
+app.locals.sanitizeApiKey = sanitizeApiKey;
+app.locals.updater_updateInstancesData = updater_updateInstancesData;
 
 // Add API versioning headers to all /api/* routes
 app.use('/api', addVersionHeaders);
