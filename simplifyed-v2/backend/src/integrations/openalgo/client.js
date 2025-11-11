@@ -110,7 +110,8 @@ class OpenAlgoClient {
       } catch (error) {
         throw new OpenAlgoError(
           `Invalid JSON response: ${await response.text()}`,
-          url
+          url,
+          response.status
         );
       }
 
@@ -118,7 +119,8 @@ class OpenAlgoClient {
       if (!response.ok) {
         throw new OpenAlgoError(
           responseData.message || `HTTP ${response.status}: ${response.statusText}`,
-          url
+          url,
+          response.status
         );
       }
 
@@ -126,7 +128,8 @@ class OpenAlgoClient {
       if (responseData.status === 'error') {
         throw new OpenAlgoError(
           responseData.message || 'OpenAlgo API returned error status',
-          url
+          url,
+          response.status
         );
       }
 

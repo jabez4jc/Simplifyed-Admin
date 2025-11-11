@@ -280,11 +280,24 @@ class InstanceService {
         // Calculate P&L
         const currentBalance = parseFloat(funds.availablecash || 0);
 
-        // Calculate realized P&L from tradebook
-        let realizedPnl = 0;
-        if (Array.isArray(tradebook)) {
+        // Get realized P&L from funds endpoint (m2mrealized or realized_pnl)
+        // Fall back to tradebook calculation if not available
+        let realizedPnl = parseFloat(
+          funds.m2mrealized ||
+          funds.realized_pnl ||
+          funds.realizedpnl ||
+          0
+        );
+
+        // If funds doesn't have realized P&L, try to calculate from tradebook
+        if (realizedPnl === 0 && Array.isArray(tradebook) && tradebook.length > 0) {
           realizedPnl = tradebook.reduce((sum, trade) => {
-            const pnl = parseFloat(trade.pnl || 0);
+            const pnl = parseFloat(
+              trade.pnl ||
+              trade.realized_pnl ||
+              trade.netpnl ||
+              0
+            );
             return sum + pnl;
           }, 0);
         }
@@ -345,36 +358,33 @@ class InstanceService {
       if (mode === true) {
         log.info('Safe-Switch: Starting Live → Analyzer workflow', { id });
 
-        try {
-          // Step 1: Close all positions
-          if (instance.strategy_tag) {
-            await openalgoClient.closePosition(instance, instance.strategy_tag);
-          }
-
-          // Step 2: Cancel all orders
-          if (instance.strategy_tag) {
-            await openalgoClient.cancelAllOrders(instance, instance.strategy_tag);
-          }
-
-          // Step 3: Verify no open positions
-          const positions = await openalgoClient.getPositionBook(instance);
-          const openPositions = positions.filter(
-            (pos) => parseFloat(pos.quantity || pos.netqty || 0) !== 0
-          );
-
-          if (openPositions.length > 0) {
-            throw new ValidationError(
-              `Cannot switch to analyzer mode: ${openPositions.length} positions still open`
-            );
-          }
-
-          log.info('Safe-Switch: All positions closed', { id });
-        } catch (error) {
-          log.warn('Safe-Switch: Error during position closure', {
-            id,
-            error: error.message,
-          });
+        // Step 1: Close all positions
+        if (instance.strategy_tag) {
+          await openalgoClient.closePosition(instance, instance.strategy_tag);
         }
+
+        // Step 2: Cancel all orders
+        if (instance.strategy_tag) {
+          await openalgoClient.cancelAllOrders(instance, instance.strategy_tag);
+        }
+
+        // Step 3: Verify no open positions
+        const positions = await openalgoClient.getPositionBook(instance);
+        const openPositions = positions.filter(
+          (pos) => parseFloat(pos.quantity || pos.netqty || 0) !== 0
+        );
+
+        if (openPositions.length > 0) {
+          log.error('Safe-Switch: Cannot switch - positions still open', {
+            id,
+            open_positions: openPositions.length,
+          });
+          throw new ValidationError(
+            `Cannot switch to analyzer mode: ${openPositions.length} positions still open`
+          );
+        }
+
+        log.info('Safe-Switch: All positions closed', { id });
       }
 
       // Toggle analyzer mode

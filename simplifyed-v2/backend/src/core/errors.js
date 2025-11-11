@@ -123,8 +123,8 @@ export class ExternalAPIError extends AppError {
  * OpenAlgo specific error
  */
 export class OpenAlgoError extends ExternalAPIError {
-  constructor(message, endpoint = null) {
-    super('OpenAlgo', message, 502);
+  constructor(message, endpoint = null, statusCode = 502) {
+    super('OpenAlgo', message, statusCode);
     this.endpoint = endpoint;
   }
 

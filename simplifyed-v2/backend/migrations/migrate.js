@@ -138,11 +138,11 @@ async function migrateDown() {
     log.info(`🔄 Rolling back: ${migration.name}`);
 
     try {
-      if (migration.down) {
-        await migration.down(db);
-      } else {
-        log.warn('⚠️  No down migration defined, skipping');
+      if (!migration.down) {
+        throw new Error('Migration has no down() method - cannot rollback');
       }
+
+      await migration.down(db);
 
       await db.run('DELETE FROM schema_migrations WHERE version = ?', [
         migration.version,

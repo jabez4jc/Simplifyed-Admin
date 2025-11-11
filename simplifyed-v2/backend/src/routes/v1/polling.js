@@ -65,7 +65,12 @@ router.post('/market-data/start', async (req, res, next) => {
       throw new ValidationError('watchlistId is required');
     }
 
-    await pollingService.startMarketDataPolling(parseInt(watchlistId, 10));
+    const id = parseInt(watchlistId, 10);
+    if (isNaN(id) || id <= 0) {
+      throw new ValidationError('watchlistId must be a positive integer');
+    }
+
+    await pollingService.startMarketDataPolling(id);
 
     res.json({
       status: 'success',

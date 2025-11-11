@@ -8,7 +8,7 @@ export const name = 'add_database_indexes';
 
 export async function up(db) {
   // Instances indexes
-  await db.run('CREATE INDEX IF NOT EXISTS idx_instances_host_url ON instances(host_url)');
+  // Note: host_url has UNIQUE constraint, so implicit index already exists
   await db.run('CREATE INDEX IF NOT EXISTS idx_instances_is_active ON instances(is_active)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_instances_is_primary_admin ON instances(is_primary_admin)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_instances_is_secondary_admin ON instances(is_secondary_admin)');
@@ -23,6 +23,7 @@ export async function up(db) {
   await db.run('CREATE INDEX IF NOT EXISTS idx_watchlist_symbols_is_enabled ON watchlist_symbols(is_enabled)');
 
   // Watchlist instances indexes
+  // Note: UNIQUE(watchlist_id, instance_id) provides implicit composite index
   await db.run('CREATE INDEX IF NOT EXISTS idx_watchlist_instances_watchlist_id ON watchlist_instances(watchlist_id)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_watchlist_instances_instance_id ON watchlist_instances(instance_id)');
 
@@ -42,7 +43,7 @@ export async function up(db) {
   await db.run('CREATE INDEX IF NOT EXISTS idx_watchlist_positions_is_closed ON watchlist_positions(is_closed)');
 
   // Market data indexes
-  await db.run('CREATE INDEX IF NOT EXISTS idx_market_data_exchange_symbol ON market_data(exchange, symbol)');
+  // Note: UNIQUE(exchange, symbol) provides implicit composite index
   await db.run('CREATE INDEX IF NOT EXISTS idx_market_data_updated_at ON market_data(updated_at)');
 
   // System alerts indexes
@@ -53,6 +54,7 @@ export async function up(db) {
   await db.run('CREATE INDEX IF NOT EXISTS idx_system_alerts_created_at ON system_alerts(created_at)');
 
   // Symbol search cache indexes
+  // Note: UNIQUE(search_query, symbol, exchange) provides implicit composite index
   await db.run('CREATE INDEX IF NOT EXISTS idx_symbol_search_cache_query ON symbol_search_cache(search_query)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_symbol_search_cache_symbol ON symbol_search_cache(symbol)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_symbol_search_cache_exchange ON symbol_search_cache(exchange)');
@@ -63,17 +65,16 @@ export async function up(db) {
   await db.run('CREATE INDEX IF NOT EXISTS idx_websocket_sessions_status ON websocket_sessions(status)');
 
   // Users indexes
-  await db.run('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
+  // Note: email has UNIQUE constraint, so implicit index already exists
   await db.run('CREATE INDEX IF NOT EXISTS idx_users_is_admin ON users(is_admin)');
 
-  console.log('  ✅ Created all database indexes');
+  console.log('  ✅ Created all database indexes (redundant indexes removed)');
 }
 
 export async function down(db) {
-  // Drop all indexes
+  // Drop all indexes (excluding those created implicitly by UNIQUE constraints)
   const indexes = [
     // Instances
-    'idx_instances_host_url',
     'idx_instances_is_active',
     'idx_instances_is_primary_admin',
     'idx_instances_is_secondary_admin',
@@ -107,7 +108,6 @@ export async function down(db) {
     'idx_watchlist_positions_is_closed',
 
     // Market data
-    'idx_market_data_exchange_symbol',
     'idx_market_data_updated_at',
 
     // System alerts
@@ -128,7 +128,6 @@ export async function down(db) {
     'idx_websocket_sessions_status',
 
     // Users
-    'idx_users_email',
     'idx_users_is_admin',
   ];
 
