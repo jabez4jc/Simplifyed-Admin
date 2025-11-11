@@ -5,6 +5,7 @@ import ConnectSqlite3 from 'connect-sqlite3';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 
 const SQLiteStore = ConnectSqlite3(session);
 
@@ -16,13 +17,29 @@ function getSessionSecret() {
   }
 
   const provided = process.env.SESSION_SECRET;
+
+  // In production, SESSION_SECRET is REQUIRED
+  if (process.env.NODE_ENV === 'production') {
+    if (!provided || provided.length < 32) {
+      console.error('❌ FATAL: SESSION_SECRET must be set in production environment');
+      console.error('   Generate one with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
+      process.exit(1);
+    }
+    cachedSessionSecret = provided;
+    console.log('✅ Session secret loaded from environment');
+    return cachedSessionSecret;
+  }
+
+  // In development, warn but allow temporary secret
   if (provided && provided.length >= 32) {
     cachedSessionSecret = provided;
+    console.log('✅ Session secret loaded from environment');
     return cachedSessionSecret;
   }
 
   cachedSessionSecret = crypto.randomBytes(64).toString('hex');
-  console.warn('⚠️  SESSION_SECRET not set or too short. Generated a temporary secret for this runtime.');
+  console.warn('⚠️  SESSION_SECRET not set. Generated temporary secret for development.');
+  console.warn('   Add to .env: SESSION_SECRET=' + cachedSessionSecret);
   return cachedSessionSecret;
 }
 
@@ -152,15 +169,33 @@ export function configureAuth(app, basePath, dbAsync) {
 
 // Setup authentication routes
 export function setupAuthRoutes(app) {
+  // Rate limiter for authentication routes
+  const authRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // Limit each IP to 20 requests per windowMs
+    message: {
+      error: 'Too many authentication attempts. Please try again later.',
+      retryAfter: '15 minutes'
+    },
+    standardHeaders: true, // Return rate limit info in headers
+    legacyHeaders: false, // Disable X-RateLimit-* headers
+    // Skip test mode in development
+    skip: (req) => process.env.TEST_MODE === 'true' && process.env.NODE_ENV !== 'production'
+  });
+
+  console.log('✅ Authentication rate limiting configured (20 requests / 15 minutes per IP)');
+
   // Google OAuth routes
   app.get('/auth/google',
-    passport.authenticate('google', { 
+    authRateLimiter,
+    passport.authenticate('google', {
       scope: ['profile', 'email'],
       prompt: 'select_account'
     })
   );
 
   app.get('/auth/google/callback',
+    authRateLimiter,
     passport.authenticate('google', {
       failureRedirect: '/auth/unauthorized',
       failureFlash: false
@@ -230,9 +265,21 @@ export function setupAuthRoutes(app) {
   });
 }
 
-// Check if test mode is enabled
-const isTestMode = process.env.TEST_MODE === 'true';
-console.log('🔍 TEST_MODE check:', { value: process.env.TEST_MODE, isTestMode });
+// Check if test mode is enabled (ONLY in development)
+const isTestMode = process.env.TEST_MODE === 'true' && process.env.NODE_ENV !== 'production';
+
+// Prevent test mode in production
+if (process.env.TEST_MODE === 'true' && process.env.NODE_ENV === 'production') {
+  console.error('❌ FATAL: TEST_MODE cannot be enabled in production environment');
+  console.error('   This would bypass all authentication and create a critical security vulnerability');
+  process.exit(1);
+}
+
+console.log('🔍 TEST_MODE check:', {
+  value: process.env.TEST_MODE,
+  environment: process.env.NODE_ENV,
+  isTestMode
+});
 
 // Test mode user
 const testUser = {
@@ -245,10 +292,11 @@ const testUser = {
 
 // Authentication middleware
 export function requireAuth(req, res, next) {
-  // Check if test mode is enabled
+  // Check if test mode is enabled (only in development)
   if (isTestMode) {
     // In test mode, create a test session
     req.user = testUser;
+    console.warn('⚠️  Using test mode authentication bypass (development only)');
     return next();
   }
 
@@ -259,10 +307,11 @@ export function requireAuth(req, res, next) {
 }
 
 export async function requireAdminAccess(req, res, next) {
-  // Check if test mode is enabled
+  // Check if test mode is enabled (only in development)
   if (isTestMode) {
     // In test mode, user is already admin
     req.user = testUser;
+    console.warn('⚠️  Using test mode admin bypass (development only)');
     return next();
   }
 
@@ -299,8 +348,9 @@ export async function requireAdminAccess(req, res, next) {
 
 // Log test mode status
 if (isTestMode) {
-  console.log('🧪 TEST MODE ENABLED - Authentication bypassed');
+  console.log('🧪 TEST MODE ENABLED - Authentication bypassed (development only)');
   console.log('   Test user: test@simplifyed.in (Admin)');
+  console.log('   ⚠️  This mode is DISABLED in production for security');
 } else {
   console.log('🔐 Authentication enabled (Google OAuth)');
 }
