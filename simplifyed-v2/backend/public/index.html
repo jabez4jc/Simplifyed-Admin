@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simplifyed Admin V2</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .landing-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .landing-card {
+      background: white;
+      padding: 3rem;
+      border-radius: 1rem;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      max-width: 400px;
+    }
+
+    .landing-card h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      color: var(--color-neutral-900);
+    }
+
+    .landing-card p {
+      color: var(--color-neutral-600);
+      margin-bottom: 2rem;
+    }
+
+    .landing-card .btn {
+      width: 100%;
+      padding: 1rem;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="landing-container">
+    <div class="landing-card">
+      <h1>📊 Simplifyed Admin</h1>
+      <p>Trading Management Dashboard V2.0</p>
+
+      <button class="btn btn-primary" onclick="window.location.href='/dashboard.html'">
+        Enter Dashboard
+      </button>
+
+      <div style="margin-top: 2rem; font-size: 0.875rem; color: var(--color-neutral-500);">
+        <p>Running in <strong>Test Mode</strong></p>
+        <p>No authentication required</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

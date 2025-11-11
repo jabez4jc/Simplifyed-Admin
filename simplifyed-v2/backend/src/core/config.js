@@ -83,6 +83,18 @@ export const config = {
     callbackUrl: getEnv('GOOGLE_CALLBACK_URL', 'http://localhost:3000/auth/google/callback'),
   },
 
+  // Authentication
+  auth: {
+    googleClientId: getEnv('GOOGLE_CLIENT_ID'),
+    googleClientSecret: getEnv('GOOGLE_CLIENT_SECRET'),
+  },
+
+  // CORS
+  cors: {
+    origin: getEnv('CORS_ORIGIN', 'http://localhost:3000'),
+    credentials: true,
+  },
+
   // Test Mode
   testMode: {
     enabled: getEnvBool('TEST_MODE', false),

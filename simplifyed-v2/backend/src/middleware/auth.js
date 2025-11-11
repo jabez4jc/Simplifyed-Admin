@@ -6,7 +6,6 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import session from 'express-session';
-import SqliteStore from 'better-sqlite3-session-store';
 import db from '../core/database.js';
 import { config } from '../core/config.js';
 import { log } from '../core/logger.js';
@@ -16,16 +15,8 @@ import { UnauthorizedError, ForbiddenError } from '../core/errors.js';
  * Configure session middleware
  */
 export function configureSession() {
-  const SessionStore = SqliteStore(session);
-
+  // Use memory store for now (for production, use connect-sqlite3 or similar)
   return session({
-    store: new SessionStore({
-      client: db.db, // Better-sqlite3 instance
-      expired: {
-        clear: true,
-        intervalMs: 900000, // 15 minutes
-      },
-    }),
     secret: config.session.secret,
     resave: false,
     saveUninitialized: false,
