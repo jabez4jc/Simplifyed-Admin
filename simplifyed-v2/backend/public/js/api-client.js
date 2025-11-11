@@ -12,7 +12,9 @@ class APIClient {
    * Generic request handler
    */
   async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
+    // Allow per-request baseURL override
+    const baseURL = options.baseURL || this.baseURL;
+    const url = `${baseURL}${endpoint}`;
 
     const config = {
       method: options.method || 'GET',

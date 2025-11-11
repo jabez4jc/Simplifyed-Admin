@@ -898,11 +898,11 @@ class DashboardApp {
   }
 }
 
-// Initialize app when DOM is ready
-const app = new DashboardApp();
+// Initialize app when DOM is ready and expose globally for inline handlers
+window.app = new DashboardApp();
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => app.init());
+  document.addEventListener('DOMContentLoaded', () => window.app.init());
 } else {
-  app.init();
+  window.app.init();
 }

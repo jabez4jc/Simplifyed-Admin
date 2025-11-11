@@ -281,26 +281,13 @@ class InstanceService {
         const currentBalance = parseFloat(funds.availablecash || 0);
 
         // Get realized P&L from funds endpoint (m2mrealized or realized_pnl)
-        // Fall back to tradebook calculation if not available
-        let realizedPnl = parseFloat(
+        // OpenAlgo's tradebook doesn't expose per-trade P&L, so we rely on the funds endpoint
+        const realizedPnl = parseFloat(
           funds.m2mrealized ||
           funds.realized_pnl ||
           funds.realizedpnl ||
           0
         );
-
-        // If funds doesn't have realized P&L, try to calculate from tradebook
-        if (realizedPnl === 0 && Array.isArray(tradebook) && tradebook.length > 0) {
-          realizedPnl = tradebook.reduce((sum, trade) => {
-            const pnl = parseFloat(
-              trade.pnl ||
-              trade.realized_pnl ||
-              trade.netpnl ||
-              0
-            );
-            return sum + pnl;
-          }, 0);
-        }
 
         // Calculate unrealized P&L from positionbook
         let unrealizedPnl = 0;
@@ -358,17 +345,28 @@ class InstanceService {
       if (mode === true) {
         log.info('Safe-Switch: Starting Live → Analyzer workflow', { id });
 
-        // Step 1: Close all positions
-        if (instance.strategy_tag) {
-          await openalgoClient.closePosition(instance, instance.strategy_tag);
+        // Execute closure steps, but always verify afterward even if cancellation fails
+        let closureError = null;
+        try {
+          // Step 1: Close all positions
+          if (instance.strategy_tag) {
+            await openalgoClient.closePosition(instance, instance.strategy_tag);
+          }
+
+          // Step 2: Cancel all orders
+          if (instance.strategy_tag) {
+            await openalgoClient.cancelAllOrders(instance, instance.strategy_tag);
+          }
+        } catch (error) {
+          // Capture error but continue to verification
+          closureError = error;
+          log.warn('Safe-Switch: Error during closure workflow', {
+            id,
+            error: error.message,
+          });
         }
 
-        // Step 2: Cancel all orders
-        if (instance.strategy_tag) {
-          await openalgoClient.cancelAllOrders(instance, instance.strategy_tag);
-        }
-
-        // Step 3: Verify no open positions
+        // Step 3: Verify no open positions (always executes)
         const positions = await openalgoClient.getPositionBook(instance);
         const openPositions = positions.filter(
           (pos) => parseFloat(pos.quantity || pos.netqty || 0) !== 0
@@ -382,6 +380,14 @@ class InstanceService {
           throw new ValidationError(
             `Cannot switch to analyzer mode: ${openPositions.length} positions still open`
           );
+        }
+
+        // If closure had an error but positions are somehow closed, log warning
+        if (closureError) {
+          log.warn('Safe-Switch: Verification passed despite closure error', {
+            id,
+            original_error: closureError.message,
+          });
         }
 
         log.info('Safe-Switch: All positions closed', { id });

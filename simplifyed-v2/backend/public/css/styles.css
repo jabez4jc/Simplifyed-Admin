@@ -613,3 +613,38 @@ body {
 .hidden { display: none; }
 .text-center { text-align: center; }
 .text-right { text-align: right; }
+
+/* ========== Landing Page ========== */
+.landing-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.landing-card {
+  background: white;
+  padding: var(--space-12);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  max-width: 400px;
+}
+
+.landing-card h1 {
+  font-size: var(--font-size-3xl);
+  margin-bottom: var(--space-2);
+  color: var(--color-neutral-900);
+}
+
+.landing-card p {
+  color: var(--color-neutral-600);
+  margin-bottom: var(--space-8);
+}
+
+.landing-card .btn {
+  width: 100%;
+  padding: var(--space-4);
+  font-size: var(--font-size-base);
+}
