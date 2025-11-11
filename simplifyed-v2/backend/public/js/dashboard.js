@@ -987,8 +987,159 @@ class DashboardApp {
   }
 
   // Placeholder methods
-  showEditInstanceModal(id) {
-    Utils.showToast('Edit instance - Coming soon', 'info');
+  /**
+   * Show edit instance modal
+   */
+  async showEditInstanceModal(id) {
+    try {
+      // Fetch instance data
+      const response = await api.getInstanceById(id);
+      const instance = response.data;
+
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Edit Instance: ${Utils.escapeHTML(instance.name)}</h3>
+          </div>
+          <div class="modal-body">
+            <form id="edit-instance-form">
+              <input type="hidden" name="instance_id" value="${instance.id}">
+
+              <div class="form-group">
+                <label class="form-label">Instance Name *</label>
+                <input type="text" name="name" class="form-input"
+                       value="${Utils.escapeHTML(instance.name)}" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Host URL *</label>
+                <input type="url" name="host_url" class="form-input"
+                       value="${Utils.escapeHTML(instance.host_url)}" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">API Key *</label>
+                <input type="text" name="api_key" class="form-input"
+                       value="${Utils.escapeHTML(instance.api_key)}" required>
+                <small class="form-help" style="display: block; margin-top: 0.25rem; color: var(--color-neutral-600);">
+                  Update API key if credentials have changed
+                </small>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Broker (auto-detected, read-only)</label>
+                <input type="text" name="broker" class="form-input" readonly
+                       value="${Utils.escapeHTML(instance.broker || 'N/A')}"
+                       style="background-color: var(--color-neutral-100); cursor: not-allowed;">
+                <small class="form-help" style="display: block; margin-top: 0.25rem; color: var(--color-neutral-600);">
+                  Broker field is immutable after instance creation
+                </small>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Market Data Role</label>
+                <select name="market_data_role" class="form-select">
+                  <option value="none" ${instance.market_data_role === 'none' ? 'selected' : ''}>
+                    None - Don't use for market data
+                  </option>
+                  <option value="primary" ${instance.market_data_role === 'primary' ? 'selected' : ''}>
+                    Primary - Use first for market data calls
+                  </option>
+                  <option value="secondary" ${instance.market_data_role === 'secondary' ? 'selected' : ''}>
+                    Secondary - Fallback for market data calls
+                  </option>
+                </select>
+                <small class="form-help" style="display: block; margin-top: 0.25rem; color: var(--color-neutral-600);">
+                  Only Primary/Secondary instances will be used for fetching market data
+                </small>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Strategy Tag</label>
+                <input type="text" name="strategy_tag" class="form-input"
+                       value="${Utils.escapeHTML(instance.strategy_tag || 'default')}">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Target Profit</label>
+                <input type="number" name="target_profit" class="form-input" step="0.01"
+                       value="${instance.target_profit || 5000}">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Target Loss</label>
+                <input type="number" name="target_loss" class="form-input" step="0.01"
+                       value="${instance.target_loss || 2000}">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">
+                  <input type="checkbox" name="is_active"
+                         ${instance.is_active ? 'checked' : ''}>
+                  Active Instance
+                </label>
+                <small class="form-help" style="display: block; margin-top: 0.25rem; color: var(--color-neutral-600);">
+                  Inactive instances won't be polled or used for trading
+                </small>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+              Cancel
+            </button>
+            <button class="btn btn-primary" onclick="app.submitEditInstance()">
+              Update Instance
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Close on overlay click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      });
+    } catch (error) {
+      Utils.showToast('Failed to load instance: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Submit edit instance form
+   */
+  async submitEditInstance() {
+    const form = document.getElementById('edit-instance-form');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    // Extract instance ID
+    const instanceId = parseInt(data.instance_id);
+    delete data.instance_id;
+
+    // Convert checkbox to boolean
+    data.is_active = form.querySelector('input[name="is_active"]').checked;
+
+    // Remove broker field - it's immutable
+    delete data.broker;
+
+    try {
+      await api.updateInstance(instanceId, data);
+      Utils.showToast('Instance updated successfully', 'success');
+
+      // Close modal
+      document.querySelector('.modal-overlay').remove();
+
+      // Refresh view
+      await this.refreshCurrentView();
+    } catch (error) {
+      Utils.showToast(error.message, 'error');
+    }
   }
 
   showEditWatchlistModal(id) {
