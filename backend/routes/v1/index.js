@@ -9,7 +9,7 @@ import express from 'express';
 import { requireAuth, requireAdminAccess } from '../../auth.js';
 
 // Import existing route modules
-import watchlistRoutes from '../watchlist.js';
+import watchlistRoutes from '../watchlist/index.js';
 import symbolRoutes from '../symbols.js';
 import symbolSearchRoutes from '../symbol-search.js';
 import watchlistOrderRoutes from '../watchlist-orders.js';
