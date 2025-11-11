@@ -97,30 +97,35 @@ class InstanceService {
         throw new ConflictError('Instance with this host URL already exists');
       }
 
-      // Test connection before creating
-      const isValid = await openalgoClient.validateConnection({
+      // Test connection and auto-detect broker
+      const connectionTest = await this.testConnection({
         host_url: normalized.host_url,
         api_key: normalized.api_key,
       });
 
-      if (!isValid) {
-        throw new ValidationError('Failed to connect to OpenAlgo instance');
+      if (!connectionTest.success) {
+        throw new ValidationError(connectionTest.message || 'Failed to connect to OpenAlgo instance');
       }
+
+      // Auto-populate broker from ping response
+      normalized.broker = connectionTest.broker;
 
       // Create instance
       const result = await db.run(
         `INSERT INTO instances (
-          name, host_url, api_key, strategy_tag,
+          name, host_url, api_key, broker, strategy_tag,
           is_primary_admin, is_secondary_admin,
-          target_profit, target_loss
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          market_data_role, target_profit, target_loss
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           normalized.name,
           normalized.host_url,
           normalized.api_key,
+          normalized.broker,
           normalized.strategy_tag,
           normalized.is_primary_admin ? 1 : 0,
           normalized.is_secondary_admin ? 1 : 0,
+          normalized.market_data_role || 'none',
           normalized.target_profit,
           normalized.target_loss,
         ]
@@ -128,7 +133,7 @@ class InstanceService {
 
       const instance = await this.getInstanceById(result.lastID);
 
-      log.info('Instance created', { id: instance.id, name: instance.name });
+      log.info('Instance created', { id: instance.id, name: instance.name, broker: instance.broker });
 
       return instance;
     } catch (error) {
@@ -153,6 +158,15 @@ class InstanceService {
 
       // Normalize updates
       const normalized = this._normalizeInstanceData(updates, true);
+
+      // Broker field is immutable - prevent manual overwrites
+      if (normalized.broker !== undefined) {
+        log.warn('Attempted to update immutable broker field - ignoring', {
+          id,
+          attempted_broker: normalized.broker,
+        });
+        delete normalized.broker;
+      }
 
       // Build update query
       const fields = [];
@@ -413,6 +427,107 @@ class InstanceService {
   }
 
   /**
+   * Test connection to OpenAlgo instance (using ping endpoint)
+   * @param {Object} credentials - { host_url, api_key }
+   * @returns {Promise<Object>} - { success, broker, message }
+   */
+  async testConnection(credentials) {
+    try {
+      const { host_url, api_key } = credentials;
+
+      if (!host_url || !api_key) {
+        return {
+          success: false,
+          message: 'Host URL and API key are required',
+        };
+      }
+
+      // Create temporary instance object for testing
+      const tempInstance = {
+        host_url: normalizeUrl(host_url),
+        api_key: sanitizeApiKey(api_key),
+      };
+
+      // Call ping endpoint to test connection and get broker name
+      const pingResponse = await openalgoClient.ping(tempInstance);
+
+      if (pingResponse && pingResponse.data && pingResponse.data.broker) {
+        log.info('Connection test successful', {
+          host_url: tempInstance.host_url,
+          broker: pingResponse.data.broker,
+        });
+
+        return {
+          success: true,
+          broker: pingResponse.data.broker,
+          message: pingResponse.data.message || 'Connection successful',
+        };
+      }
+
+      return {
+        success: false,
+        message: 'Ping successful but broker information not found',
+      };
+    } catch (error) {
+      log.warn('Connection test failed', { error: error.message });
+      return {
+        success: false,
+        message: error.message || 'Failed to connect to OpenAlgo instance',
+      };
+    }
+  }
+
+  /**
+   * Test API key validity (using funds endpoint)
+   * @param {Object} credentials - { host_url, api_key }
+   * @returns {Promise<Object>} - { success, message, funds }
+   */
+  async testApiKey(credentials) {
+    try {
+      const { host_url, api_key } = credentials;
+
+      if (!host_url || !api_key) {
+        return {
+          success: false,
+          message: 'Host URL and API key are required',
+        };
+      }
+
+      // Create temporary instance object for testing
+      const tempInstance = {
+        host_url: normalizeUrl(host_url),
+        api_key: sanitizeApiKey(api_key),
+      };
+
+      // Call funds endpoint to validate API key
+      const fundsResponse = await openalgoClient.getFunds(tempInstance);
+
+      if (fundsResponse && fundsResponse.data) {
+        log.info('API key test successful', {
+          host_url: tempInstance.host_url,
+        });
+
+        return {
+          success: true,
+          message: 'API key is valid',
+          funds: fundsResponse.data,
+        };
+      }
+
+      return {
+        success: false,
+        message: 'Invalid API key or funds data not available',
+      };
+    } catch (error) {
+      log.warn('API key test failed', { error: error.message });
+      return {
+        success: false,
+        message: error.message || 'Invalid API key',
+      };
+    }
+  }
+
+  /**
    * Get admin instances
    * @returns {Promise<Object>} - { primary, secondary }
    */
@@ -429,6 +544,30 @@ class InstanceService {
       return { primary, secondary };
     } catch (error) {
       log.error('Failed to get admin instances', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get instances designated for market data (primary or secondary role)
+   * @returns {Promise<Array>} - List of instances with market data role
+   */
+  async getMarketDataInstances() {
+    try {
+      const instances = await db.all(
+        `SELECT * FROM instances
+         WHERE market_data_role IN ('primary', 'secondary')
+         AND is_active = 1
+         ORDER BY
+           CASE market_data_role
+             WHEN 'primary' THEN 1
+             WHEN 'secondary' THEN 2
+           END`
+      );
+
+      return instances;
+    } catch (error) {
+      log.error('Failed to get market data instances', error);
       throw error;
     }
   }
@@ -474,6 +613,25 @@ class InstanceService {
     // Strategy Tag
     if (data.strategy_tag !== undefined) {
       normalized.strategy_tag = sanitizeStrategyTag(data.strategy_tag);
+    }
+
+    // Broker (auto-detected, but can be overridden)
+    if (data.broker !== undefined) {
+      normalized.broker = sanitizeString(data.broker);
+    }
+
+    // Market data role
+    if (data.market_data_role !== undefined) {
+      const validRoles = ['none', 'primary', 'secondary'];
+      const role = String(data.market_data_role).toLowerCase();
+      if (validRoles.includes(role)) {
+        normalized.market_data_role = role;
+      } else if (!isUpdate) {
+        errors.push({
+          field: 'market_data_role',
+          message: 'Market data role must be one of: none, primary, secondary',
+        });
+      }
     }
 
     // Admin flags

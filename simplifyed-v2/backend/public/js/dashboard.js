@@ -592,23 +592,47 @@ class DashboardApp {
 
             <div class="form-group">
               <label class="form-label">Host URL *</label>
-              <input type="url" name="host_url" class="form-input"
+              <input type="url" name="host_url" id="instance-host-url" class="form-input"
                      placeholder="http://localhost:5000" required>
             </div>
 
             <div class="form-group">
               <label class="form-label">API Key *</label>
-              <input type="text" name="api_key" class="form-input" required>
+              <input type="text" name="api_key" id="instance-api-key" class="form-input" required>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Broker</label>
-              <select name="broker" class="form-select">
-                <option value="zerodha">Zerodha</option>
-                <option value="fyers">Fyers</option>
-                <option value="angelone">Angel One</option>
-                <option value="kotak">Kotak Securities</option>
+              <label class="form-label">Broker (auto-detected)</label>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="text" name="broker" id="instance-broker" class="form-input" readonly
+                       placeholder="Click 'Test Connection' to detect">
+                <button type="button" class="btn btn-secondary btn-sm"
+                        onclick="app.testInstanceConnection()">
+                  Test Connection
+                </button>
+              </div>
+              <small id="connection-status" class="form-help" style="display: block; margin-top: 0.25rem;"></small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Verify API Key</label>
+              <button type="button" class="btn btn-secondary btn-sm" style="width: 100%;"
+                      onclick="app.testInstanceApiKey()">
+                Test API Key with Funds Endpoint
+              </button>
+              <small id="apikey-status" class="form-help" style="display: block; margin-top: 0.25rem;"></small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Market Data Role</label>
+              <select name="market_data_role" class="form-select">
+                <option value="none">None - Don't use for market data</option>
+                <option value="primary">Primary - Use first for market data calls</option>
+                <option value="secondary">Secondary - Fallback for market data calls</option>
               </select>
+              <small class="form-help" style="display: block; margin-top: 0.25rem; color: var(--color-neutral-600);">
+                Only Primary/Secondary instances will be used for fetching market data (quotes, depth, etc.)
+              </small>
             </div>
 
             <div class="form-group">
@@ -618,12 +642,12 @@ class DashboardApp {
 
             <div class="form-group">
               <label class="form-label">Target Profit</label>
-              <input type="number" name="target_profit" class="form-input" step="0.01">
+              <input type="number" name="target_profit" class="form-input" step="0.01" placeholder="5000">
             </div>
 
             <div class="form-group">
               <label class="form-label">Target Loss</label>
-              <input type="number" name="target_loss" class="form-input" step="0.01">
+              <input type="number" name="target_loss" class="form-input" step="0.01" placeholder="2000">
             </div>
           </form>
         </div>
@@ -656,6 +680,13 @@ class DashboardApp {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
 
+    // Check if broker was detected
+    const brokerField = document.getElementById('instance-broker');
+    if (!brokerField.value) {
+      Utils.showToast('Please test connection to detect broker before adding instance', 'warning');
+      return;
+    }
+
     try {
       await api.createInstance(data);
       Utils.showToast('Instance added successfully', 'success');
@@ -667,6 +698,82 @@ class DashboardApp {
       await this.refreshCurrentView();
     } catch (error) {
       Utils.showToast(error.message, 'error');
+    }
+  }
+
+  /**
+   * Test connection to OpenAlgo instance
+   */
+  async testInstanceConnection() {
+    const hostUrl = document.getElementById('instance-host-url').value;
+    const apiKey = document.getElementById('instance-api-key').value;
+    const statusEl = document.getElementById('connection-status');
+    const brokerField = document.getElementById('instance-broker');
+
+    if (!hostUrl || !apiKey) {
+      statusEl.textContent = '⚠️ Please enter Host URL and API Key first';
+      statusEl.style.color = 'var(--color-warning)';
+      return;
+    }
+
+    statusEl.textContent = '⏳ Testing connection...';
+    statusEl.style.color = 'var(--color-info)';
+
+    try {
+      const response = await api.testConnection(hostUrl, apiKey);
+
+      if (response.status === 'success' && response.data?.broker) {
+        brokerField.value = response.data.broker;
+        statusEl.textContent = `✅ Connection successful! Broker: ${response.data.broker}`;
+        statusEl.style.color = 'var(--color-profit)';
+        Utils.showToast(`Connected successfully to ${response.data.broker}`, 'success');
+      } else {
+        statusEl.textContent = '❌ ' + (response.message || 'Connection failed');
+        statusEl.style.color = 'var(--color-loss)';
+        Utils.showToast(response.message || 'Connection test failed', 'error');
+      }
+    } catch (error) {
+      statusEl.textContent = '❌ ' + error.message;
+      statusEl.style.color = 'var(--color-loss)';
+      Utils.showToast('Connection test failed: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Test API key validity with funds endpoint
+   */
+  async testInstanceApiKey() {
+    const hostUrl = document.getElementById('instance-host-url').value;
+    const apiKey = document.getElementById('instance-api-key').value;
+    const statusEl = document.getElementById('apikey-status');
+
+    if (!hostUrl || !apiKey) {
+      statusEl.textContent = '⚠️ Please enter Host URL and API Key first';
+      statusEl.style.color = 'var(--color-warning)';
+      return;
+    }
+
+    statusEl.textContent = '⏳ Validating API key with funds endpoint...';
+    statusEl.style.color = 'var(--color-info)';
+
+    try {
+      const response = await api.testApiKey(hostUrl, apiKey);
+
+      if (response.status === 'success') {
+        const funds = response.data?.funds;
+        const cash = funds?.availablecash || 'N/A';
+        statusEl.textContent = `✅ API Key valid! Available Cash: ₹${cash}`;
+        statusEl.style.color = 'var(--color-profit)';
+        Utils.showToast('API key validated successfully', 'success');
+      } else {
+        statusEl.textContent = '❌ ' + (response.message || 'Invalid API key');
+        statusEl.style.color = 'var(--color-loss)';
+        Utils.showToast(response.message || 'API key validation failed', 'error');
+      }
+    } catch (error) {
+      statusEl.textContent = '❌ ' + error.message;
+      statusEl.style.color = 'var(--color-loss)';
+      Utils.showToast('API key validation failed: ' + error.message, 'error');
     }
   }
 

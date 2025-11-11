@@ -330,24 +330,26 @@ class PollingService {
         return;
       }
 
-      // Get assigned instances
-      const instances = await db.all(
-        `SELECT i.*
-         FROM instances i
-         JOIN watchlist_instances wi ON i.id = wi.instance_id
-         WHERE wi.watchlist_id = ? AND i.is_active = 1
-         LIMIT 1`,
-        [watchlistId]
-      );
+      // Get market data instances (primary or secondary role only)
+      // Try primary first, fallback to secondary
+      const marketDataInstances = await instanceService.getMarketDataInstances();
 
-      if (instances.length === 0) {
-        log.debug('No active instances for watchlist', {
+      if (marketDataInstances.length === 0) {
+        log.debug('No market data instances available (primary or secondary)', {
           watchlist_id: watchlistId,
         });
         return;
       }
 
-      const instance = instances[0];
+      // Use the first available market data instance (ordered by priority: primary > secondary)
+      const instance = marketDataInstances[0];
+
+      log.debug('Using market data instance', {
+        watchlist_id: watchlistId,
+        instance_id: instance.id,
+        instance_name: instance.name,
+        market_data_role: instance.market_data_role,
+      });
 
       // Group symbols by exchange for batch quote requests
       const symbolsByExchange = {};
