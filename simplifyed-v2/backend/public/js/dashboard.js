@@ -1142,17 +1142,248 @@ class DashboardApp {
     }
   }
 
-  showEditWatchlistModal(id) {
-    Utils.showToast('Edit watchlist - Coming soon', 'info');
+  /**
+   * Show edit watchlist modal
+   */
+  async showEditWatchlistModal(id) {
+    try {
+      // Fetch watchlist data
+      const response = await api.getWatchlistById(id);
+      const watchlist = response.data;
+
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Edit Watchlist: ${Utils.escapeHTML(watchlist.name)}</h3>
+          </div>
+          <div class="modal-body">
+            <form id="edit-watchlist-form">
+              <input type="hidden" name="watchlist_id" value="${watchlist.id}">
+
+              <div class="form-group">
+                <label class="form-label">Watchlist Name *</label>
+                <input type="text" name="name" class="form-input"
+                       value="${Utils.escapeHTML(watchlist.name)}" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-input" rows="3">${Utils.escapeHTML(watchlist.description || '')}</textarea>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">
+                  <input type="checkbox" name="is_active"
+                         ${watchlist.is_active ? 'checked' : ''}>
+                  Active Watchlist
+                </label>
+                <small class="form-help" style="display: block; margin-top: 0.25rem;">
+                  Inactive watchlists won't be used for trading
+                </small>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+              Cancel
+            </button>
+            <button class="btn btn-primary" onclick="app.submitEditWatchlist()">
+              Update Watchlist
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Close on overlay click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      });
+    } catch (error) {
+      Utils.showToast('Failed to load watchlist: ' + error.message, 'error');
+    }
   }
 
-  viewWatchlistDetails(id) {
-    Utils.showToast('Watchlist details - Coming soon', 'info');
+  /**
+   * Submit edit watchlist form
+   */
+  async submitEditWatchlist() {
+    const form = document.getElementById('edit-watchlist-form');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    // Extract watchlist ID
+    const watchlistId = parseInt(data.watchlist_id);
+    delete data.watchlist_id;
+
+    // Convert checkbox to boolean
+    data.is_active = form.querySelector('input[name="is_active"]').checked;
+
+    try {
+      await api.updateWatchlist(watchlistId, data);
+      Utils.showToast('Watchlist updated successfully', 'success');
+
+      // Close modal
+      document.querySelector('.modal-overlay').remove();
+
+      // Refresh view
+      await this.refreshCurrentView();
+    } catch (error) {
+      Utils.showToast(error.message, 'error');
+    }
   }
 
-  filterOrders(status) {
-    // TODO: Implement order filtering
-    console.log('Filter orders by status:', status);
+  /**
+   * View watchlist details with symbols
+   */
+  async viewWatchlistDetails(id) {
+    try {
+      // Fetch watchlist and its symbols
+      const [watchlistResponse, symbolsResponse] = await Promise.all([
+        api.getWatchlistById(id),
+        api.getWatchlistSymbols(id)
+      ]);
+
+      const watchlist = watchlistResponse.data;
+      const symbols = symbolsResponse.data || [];
+
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.innerHTML = `
+        <div class="modal-content" style="max-width: 800px;">
+          <div class="modal-header">
+            <div>
+              <h3>Watchlist Details: ${Utils.escapeHTML(watchlist.name)}</h3>
+              <p style="margin-top: 0.5rem; color: var(--color-neutral-600); font-size: 0.875rem;">
+                ${Utils.escapeHTML(watchlist.description || 'No description')}
+              </p>
+            </div>
+          </div>
+          <div class="modal-body">
+            <div class="mb-4">
+              <h4 class="font-semibold mb-2">Watchlist Information</h4>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                <div>
+                  <span class="text-neutral-600">Status:</span>
+                  ${Utils.getStatusBadge(watchlist.is_active ? 'active' : 'inactive')}
+                </div>
+                <div>
+                  <span class="text-neutral-600">Total Symbols:</span>
+                  <strong>${symbols.length}</strong>
+                </div>
+                <div>
+                  <span class="text-neutral-600">Created:</span>
+                  ${Utils.formatRelativeTime(watchlist.created_at)}
+                </div>
+                <div>
+                  <span class="text-neutral-600">Last Updated:</span>
+                  ${Utils.formatRelativeTime(watchlist.updated_at)}
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <h4 class="font-semibold mb-2">Symbols (${symbols.length})</h4>
+              ${symbols.length === 0 ? `
+                <p class="text-center text-neutral-600" style="padding: 2rem;">
+                  No symbols in this watchlist
+                </p>
+              ` : `
+                <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Exchange</th>
+                        <th>Symbol</th>
+                        <th>Quantity Type</th>
+                        <th>Quantity</th>
+                        <th>Product</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${symbols.map(s => `
+                        <tr>
+                          <td><span class="badge badge-neutral">${Utils.escapeHTML(s.exchange)}</span></td>
+                          <td class="font-medium">${Utils.escapeHTML(s.symbol)}</td>
+                          <td>${Utils.escapeHTML(s.qty_type || 'FIXED')}</td>
+                          <td>${s.qty_value || 1}</td>
+                          <td><span class="badge badge-info">${Utils.escapeHTML(s.product_type || 'MIS')}</span></td>
+                          <td>${s.is_enabled ?
+                            '<span class="badge badge-success">Enabled</span>' :
+                            '<span class="badge badge-neutral">Disabled</span>'
+                          }</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              `}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+              Close
+            </button>
+            <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove(); app.showEditWatchlistModal(${id})">
+              Edit Watchlist
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Close on overlay click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      });
+    } catch (error) {
+      Utils.showToast('Failed to load watchlist details: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * Filter orders by status
+   */
+  async filterOrders(status) {
+    try {
+      // Store current filter
+      this.currentOrderFilter = status;
+
+      // Fetch filtered orders
+      const filters = status ? { status } : {};
+      const response = await api.getOrders(filters);
+      const orders = response.data;
+
+      // Update the table
+      const tableContainer = document.querySelector('.table-container');
+      if (tableContainer) {
+        tableContainer.innerHTML = this.renderOrdersTable(orders);
+      }
+
+      // Update UI feedback
+      const selectElement = document.querySelector('select.form-select[onchange*="filterOrders"]');
+      if (selectElement) {
+        selectElement.value = status || '';
+      }
+
+      Utils.showToast(
+        status
+          ? `Showing ${orders.length} ${status} orders`
+          : `Showing all ${orders.length} orders`,
+        'info'
+      );
+    } catch (error) {
+      Utils.showToast('Failed to filter orders: ' + error.message, 'error');
+    }
   }
 }
 
