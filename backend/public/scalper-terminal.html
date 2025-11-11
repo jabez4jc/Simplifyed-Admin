@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scalper Terminal - Coming Soon</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body class="bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 min-h-screen flex items-center justify-center">
+    <div class="text-center max-w-2xl mx-auto p-8">
+        <!-- Icon -->
+        <div class="w-32 h-32 bg-slate-800/50 border border-slate-700 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl">
+            <i data-lucide="zap" class="w-16 h-16 text-amber-400"></i>
+        </div>
+
+        <!-- Title -->
+        <h1 class="text-5xl font-bold text-white mb-4">
+            Scalper Terminal
+        </h1>
+
+        <!-- Subtitle -->
+        <p class="text-xl text-slate-400 mb-8">
+            High-frequency trading interface
+        </p>
+
+        <!-- Coming Soon Badge -->
+        <div class="inline-flex items-center space-x-3 px-6 py-3 bg-amber-500/10 border border-amber-500/30 rounded-xl mb-8">
+            <i data-lucide="clock" class="w-5 h-5 text-amber-400"></i>
+            <span class="text-amber-300 text-lg font-semibold">Coming Soon</span>
+        </div>
+
+        <!-- Description -->
+        <div class="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 mb-8 text-left">
+            <h2 class="text-xl font-semibold text-white mb-4">Planned Features:</h2>
+            <ul class="space-y-3 text-slate-300">
+                <li class="flex items-start">
+                    <i data-lucide="check" class="w-5 h-5 text-green-400 mr-3 mt-0.5 flex-shrink-0"></i>
+                    <span>One-click order placement with keyboard shortcuts</span>
+                </li>
+                <li class="flex items-start">
+                    <i data-lucide="check" class="w-5 h-5 text-green-400 mr-3 mt-0.5 flex-shrink-0"></i>
+                    <span>Real-time depth-of-market (DOM) display</span>
+                </li>
+                <li class="flex items-start">
+                    <i data-lucide="check" class="w-5 h-5 text-green-400 mr-3 mt-0.5 flex-shrink-0"></i>
+                    <span>Rapid position entry/exit with configurable hotkeys</span>
+                </li>
+                <li class="flex items-start">
+                    <i data-lucide="check" class="w-5 h-5 text-green-400 mr-3 mt-0.5 flex-shrink-0"></i>
+                    <span>Tick-by-tick price ladder interface</span>
+                </li>
+                <li class="flex items-start">
+                    <i data-lucide="check" class="w-5 h-5 text-green-400 mr-3 mt-0.5 flex-shrink-0"></i>
+                    <span>Advanced order types (Iceberg, Bracket, OCO)</span>
+                </li>
+                <li class="flex items-start">
+                    <i data-lucide="check" class="w-5 h-5 text-green-400 mr-3 mt-0.5 flex-shrink-0"></i>
+                    <span>Multi-leg options strategies with one click</span>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Back to Dashboard Button -->
+        <a href="/dashboard.html" class="inline-flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 transform">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+            <span>Back to Dashboard</span>
+        </a>
+
+        <!-- Additional Info -->
+        <p class="text-slate-500 text-sm mt-8">
+            This feature is currently under development and will be available in a future update.
+        </p>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
