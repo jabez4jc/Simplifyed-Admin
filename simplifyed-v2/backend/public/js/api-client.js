@@ -118,6 +118,20 @@ class APIClient {
     });
   }
 
+  async testConnection(host_url, api_key) {
+    return this.request('/instances/test/connection', {
+      method: 'POST',
+      body: { host_url, api_key },
+    });
+  }
+
+  async testApiKey(host_url, api_key) {
+    return this.request('/instances/test/apikey', {
+      method: 'POST',
+      body: { host_url, api_key },
+    });
+  }
+
   // Watchlist APIs
   async getWatchlists(filters = {}) {
     const params = new URLSearchParams(filters);

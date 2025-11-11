@@ -139,6 +139,56 @@ router.delete('/:id', async (req, res, next) => {
 });
 
 /**
+ * POST /api/v1/instances/test/connection
+ * Test connection to OpenAlgo instance (ping endpoint)
+ * NOTE: Must be before /:id routes
+ */
+router.post('/test/connection', async (req, res, next) => {
+  try {
+    const { host_url, api_key } = req.body;
+
+    if (!host_url || !api_key) {
+      throw new ValidationError('host_url and api_key are required');
+    }
+
+    const result = await instanceService.testConnection({ host_url, api_key });
+
+    res.json({
+      status: result.success ? 'success' : 'error',
+      message: result.message,
+      data: result.success ? { broker: result.broker } : null,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/v1/instances/test/apikey
+ * Test API key validity (funds endpoint)
+ * NOTE: Must be before /:id routes
+ */
+router.post('/test/apikey', async (req, res, next) => {
+  try {
+    const { host_url, api_key } = req.body;
+
+    if (!host_url || !api_key) {
+      throw new ValidationError('host_url and api_key are required');
+    }
+
+    const result = await instanceService.testApiKey({ host_url, api_key });
+
+    res.json({
+      status: result.success ? 'success' : 'error',
+      message: result.message,
+      data: result.success ? { funds: result.funds } : null,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * POST /api/v1/instances/:id/refresh
  * Manually refresh instance data (bypasses cron)
  */

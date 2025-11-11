@@ -25,22 +25,37 @@ router.get('/search', async (req, res, next) => {
       throw new ValidationError('query parameter is required');
     }
 
-    // Get an active instance to use for search
+    // Get an instance to use for search
+    // Prefer market data instances (primary/secondary) for consistency
     let instance;
 
     if (instanceId) {
       instance = await instanceService.getInstanceById(parseInt(instanceId, 10));
     } else {
-      // Use first active instance
-      const instances = await instanceService.getAllInstances({
-        is_active: true,
-      });
+      // Use market data instance (primary or secondary)
+      const marketDataInstances = await instanceService.getMarketDataInstances();
 
-      if (instances.length === 0) {
-        throw new ValidationError('No active instances available for search');
+      if (marketDataInstances.length === 0) {
+        // Fallback to any active instance if no market data instances configured
+        const instances = await instanceService.getAllInstances({
+          is_active: true,
+        });
+
+        if (instances.length === 0) {
+          throw new ValidationError('No active instances available for search');
+        }
+
+        instance = instances[0];
+        log.debug('Using fallback instance for symbol search (no market data instances)', {
+          instance_id: instance.id,
+        });
+      } else {
+        instance = marketDataInstances[0];
+        log.debug('Using market data instance for symbol search', {
+          instance_id: instance.id,
+          market_data_role: instance.market_data_role,
+        });
       }
-
-      instance = instances[0];
     }
 
     // Search symbols via OpenAlgo
