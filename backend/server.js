@@ -37,6 +37,9 @@ import MarketDataRefreshService from './lib/market-data-refresh-service.js';
 import createPositionRoutes from './routes/positions.js';
 import createOrderRoutes from './routes/orders.js';
 import { Server as SocketIOServer } from 'socket.io';
+import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
+import { addVersionHeaders } from './middleware/api-versioning.js';
+import { createV1Router } from './routes/v1/index.js';
 
 const ALLOWED_HOST_PROTOCOLS = new Set(['http:', 'https:']);
 const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
@@ -127,185 +130,62 @@ const dbAsync = {
   })
 };
 
-// Initialize database schema
+/**
+ * Initialize database with migration system
+ *
+ * DEPRECATED: Old initializeDatabase() function has been replaced
+ * with proper migration system in db/migrations/
+ *
+ * This function now runs the migration system automatically.
+ */
 async function initializeDatabase() {
+  console.log('🔄 Running database migrations...');
+
   try {
+    // Import migrations dynamically
+    const migrations = [
+      await import('./db/migrations/000_initial_schema.js'),
+      await import('./db/migrations/001_add_missing_tables.js'),
+      await import('./db/migrations/002_add_database_indexes.js'),
+      await import('./db/migrations/003_enable_sqlite_optimizations.js')
+    ];
+
+    // Create migration tracking table
     await dbAsync.run(`
-      CREATE TABLE IF NOT EXISTS instances (
+      CREATE TABLE IF NOT EXISTS schema_migrations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        version TEXT NOT NULL UNIQUE,
         name TEXT NOT NULL,
-        host_url TEXT NOT NULL UNIQUE,
-        api_key TEXT NOT NULL,
-        strategy_tag TEXT,
-        target_profit REAL DEFAULT 5000,
-        target_loss REAL DEFAULT 2000,
-        current_pnl REAL DEFAULT 0,
-        realized_pnl REAL DEFAULT 0,
-        unrealized_pnl REAL DEFAULT 0,
-        total_pnl REAL DEFAULT 0,
-        current_balance REAL DEFAULT 0,
-        is_active BOOLEAN DEFAULT 1,
-        is_analyzer_mode BOOLEAN DEFAULT 0,
-        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    await dbAsync.run(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT NOT NULL UNIQUE,
-        is_admin BOOLEAN DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    // Get already applied migrations
+    const applied = await dbAsync.all('SELECT version FROM schema_migrations ORDER BY version ASC');
+    const appliedVersions = new Set(applied.map(row => row.version));
 
-    // Add migration for new P&L columns if they don't exist
-    try {
-      await dbAsync.run('ALTER TABLE instances ADD COLUMN realized_pnl REAL DEFAULT 0');
-      console.log('✅ Added realized_pnl column to instances table');
-    } catch (error) {
-      // Column already exists, ignore error
+    // Run pending migrations
+    let appliedCount = 0;
+    for (const migration of migrations) {
+      if (!appliedVersions.has(migration.version)) {
+        console.log(`  ⬆️  Applying migration: ${migration.name}`);
+        await migration.up(dbAsync);
+        await dbAsync.run(
+          'INSERT INTO schema_migrations (version, name) VALUES (?, ?)',
+          [migration.version, migration.name]
+        );
+        appliedCount++;
+      }
     }
 
-    try {
-      await dbAsync.run('ALTER TABLE instances ADD COLUMN unrealized_pnl REAL DEFAULT 0');
-      console.log('✅ Added unrealized_pnl column to instances table');
-    } catch (error) {
-      // Column already exists, ignore error
+    if (appliedCount === 0) {
+      console.log('✅ Database is up to date (no pending migrations)');
+    } else {
+      console.log(`✅ Applied ${appliedCount} migration(s)`);
     }
-
-    try {
-      await dbAsync.run('ALTER TABLE instances ADD COLUMN total_pnl REAL DEFAULT 0');
-      console.log('✅ Added total_pnl column to instances table');
-    } catch (error) {
-      // Column already exists, ignore error
-    }
-
-    // Create rate_limit_log table for tracking API usage
-    await dbAsync.run(`
-      CREATE TABLE IF NOT EXISTS rate_limit_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        instance_id INTEGER NOT NULL,
-        endpoint TEXT NOT NULL,
-        tokens_available INTEGER NOT NULL,
-        wait_time_ms INTEGER NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (instance_id) REFERENCES instances (id)
-      )
-    `);
-
-    // Create watchlists table
-    await dbAsync.run(`
-      CREATE TABLE IF NOT EXISTS watchlists (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        description TEXT,
-        is_active BOOLEAN DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create watchlist_symbols table
-    await dbAsync.run(`
-      CREATE TABLE IF NOT EXISTS watchlist_symbols (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        watchlist_id INTEGER NOT NULL,
-        exchange TEXT NOT NULL,
-        symbol TEXT NOT NULL,
-        token TEXT,
-        lot_size INTEGER DEFAULT 1,
-        qty_type TEXT DEFAULT 'FIXED',
-        qty_value INTEGER DEFAULT 1,
-        qty_mode TEXT DEFAULT 'fixed',
-        qty_units TEXT DEFAULT 'units',
-        min_qty_per_click INTEGER DEFAULT 1,
-        max_qty_per_click INTEGER,
-        capital_ceiling_per_trade REAL,
-        contract_multiplier REAL DEFAULT 1.0,
-        rounding TEXT DEFAULT 'floor_to_lot',
-        product_type TEXT DEFAULT 'MIS',
-        order_type TEXT DEFAULT 'MARKET',
-        target_type TEXT DEFAULT 'NONE',
-        target_value REAL,
-        sl_type TEXT DEFAULT 'NONE',
-        sl_value REAL,
-        ts_type TEXT DEFAULT 'NONE',
-        ts_value REAL,
-        trailing_activation_type TEXT DEFAULT 'IMMEDIATE',
-        trailing_activation_value REAL,
-        max_position_size INTEGER,
-        max_instances INTEGER,
-        is_enabled BOOLEAN DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (watchlist_id) REFERENCES watchlists (id) ON DELETE CASCADE
-      )
-    `);
-
-    // Create watchlist_instances table (Junction table)
-    await dbAsync.run(`
-      CREATE TABLE IF NOT EXISTS watchlist_instances (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        watchlist_id INTEGER NOT NULL,
-        instance_id INTEGER NOT NULL,
-        assigned_by TEXT,
-        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (watchlist_id) REFERENCES watchlists (id) ON DELETE CASCADE,
-        FOREIGN KEY (instance_id) REFERENCES instances (id) ON DELETE CASCADE,
-        UNIQUE(watchlist_id, instance_id)
-      )
-    `);
-
-    // Create symbol_search_cache table for caching search results
-    await dbAsync.run(`
-      CREATE TABLE IF NOT EXISTS symbol_search_cache (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        search_query TEXT NOT NULL,
-        symbol TEXT NOT NULL,
-        tradingsymbol TEXT NOT NULL,
-        exchange TEXT NOT NULL,
-        exchange_segment TEXT,
-        instrument_type TEXT,
-        lot_size INTEGER,
-        tick_size REAL,
-        name TEXT,
-        isin TEXT,
-        asset_class TEXT DEFAULT 'EQUITY',
-        can_trade_equity INTEGER DEFAULT 0,
-        can_trade_futures INTEGER DEFAULT 0,
-        can_trade_options INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(search_query, symbol, exchange)
-      )
-    `);
-
-    // Add new classification columns if they don't exist
-    try {
-      await dbAsync.run(`ALTER TABLE symbol_search_cache ADD COLUMN asset_class TEXT DEFAULT 'EQUITY'`);
-    } catch (e) {
-      // Column might already exist
-    }
-    try {
-      await dbAsync.run(`ALTER TABLE symbol_search_cache ADD COLUMN can_trade_equity INTEGER DEFAULT 0`);
-    } catch (e) {
-      // Column might already exist
-    }
-    try {
-      await dbAsync.run(`ALTER TABLE symbol_search_cache ADD COLUMN can_trade_futures INTEGER DEFAULT 0`);
-    } catch (e) {
-      // Column might already exist
-    }
-    try {
-      await dbAsync.run(`ALTER TABLE symbol_search_cache ADD COLUMN can_trade_options INTEGER DEFAULT 0`);
-    } catch (e) {
-      // Column might already exist
-    }
-
-    console.log('✅ Database initialized successfully');
   } catch (error) {
-    console.error('❌ Database initialization failed:', error);
+    console.error('❌ Database migration failed:', error);
+    throw error; // Fail fast on migration errors
   }
 }
 
@@ -335,7 +215,16 @@ setupAuthRoutes(app);
 // Make dbAsync available to routes
 app.locals.dbAsync = dbAsync;
 
-// Mount watchlist feature routes
+// Add API versioning headers to all /api/* routes
+app.use('/api', addVersionHeaders);
+
+// Mount API v1 routes (NEW - versioned routes)
+const v1Router = createV1Router({ dbAsync, io: null }); // io will be set after server starts
+app.use('/api/v1', v1Router);
+
+// Legacy routes (DEPRECATED - kept for backward compatibility)
+// These will be removed in v2.0.0
+console.log('⚠️  Mounting legacy /api/* routes for backward compatibility');
 app.use('/api/watchlists', requireAuth, watchlistRoutes);
 app.use('/api/watchlists', requireAuth, symbolRoutes);
 app.use('/api/watchlists', requireAuth, watchlistOrderRoutes);
@@ -1111,6 +1000,10 @@ async function initializeWebSocketServices(httpServer) {
     app.use('/api/orders', requireAuth, orderRoutes);
     console.log('✅ Order management routes mounted');
 
+    // Add error handling middleware (MUST be last)
+    app.use(notFoundHandler); // 404 handler
+    app.use(errorHandler);    // Global error handler
+    console.log('✅ Error handling middleware mounted');
   } catch (error) {
     console.error('❌ Failed to initialize WebSocket services:', error);
     console.log('⚠️  Server will continue without WebSocket functionality');
