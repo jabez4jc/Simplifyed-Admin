@@ -315,9 +315,24 @@ app.post('/api/instances', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error creating instance:', error);
     if (error.message.includes('UNIQUE constraint failed')) {
-      res.status(409).json({ error: 'Instance with this host URL already exists' });
+      res.status(409).json({
+        status: 'error',
+        error: 'Instance with this host URL already exists',
+        message: 'Instance with this host URL already exists'
+      });
+    } else if (error.message.includes('no such column')) {
+      res.status(500).json({
+        status: 'error',
+        error: 'Database schema outdated. Please run migrations: node db/migrate.js up',
+        message: 'Database schema outdated. Please run migrations.',
+        details: error.message
+      });
     } else {
-      res.status(500).json({ error: 'Failed to create instance' });
+      res.status(500).json({
+        status: 'error',
+        error: error.message || 'Failed to create instance',
+        message: error.message || 'Failed to create instance'
+      });
     }
   }
 });
@@ -413,7 +428,11 @@ app.put('/api/instances/:id', requireAuth, async (req, res) => {
     res.json(updatedInstance);
   } catch (error) {
     console.error('Error updating instance:', error);
-    res.status(500).json({ error: 'Failed to update instance' });
+    res.status(500).json({
+      status: 'error',
+      error: error.message || 'Failed to update instance',
+      message: error.message || 'Failed to update instance'
+    });
   }
 });
 
@@ -424,7 +443,11 @@ app.delete('/api/instances/:id', requireAuth, async (req, res) => {
     res.json({ message: 'Instance deleted successfully' });
   } catch (error) {
     console.error('Error deleting instance:', error);
-    res.status(500).json({ error: 'Failed to delete instance' });
+    res.status(500).json({
+      status: 'error',
+      error: error.message || 'Failed to delete instance',
+      message: error.message || 'Failed to delete instance'
+    });
   }
 });
 
