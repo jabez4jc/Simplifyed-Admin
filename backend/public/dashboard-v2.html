@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simplifyed Trading Dashboard</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+    <!-- Custom Styles -->
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* Loading states */
+        .loading {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* View modes */
+        .card-view {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .table-view {
+            display: table;
+            width: 100%;
+        }
+
+        /* Animations */
+        .slide-enter {
+            transform: translateY(-20px);
+            opacity: 0;
+        }
+
+        .slide-enter-active {
+            transform: translateY(0);
+            opacity: 1;
+            transition: all 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        /* Status indicators */
+        .status-live {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        .status-analyzer {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+
+        .status-inactive {
+            background: linear-gradient(135deg, #64748b, #475569);
+        }
+
+        /* View toggle buttons */
+        .view-btn {
+            color: #94a3b8;
+            background-color: transparent;
+            transition: all 0.2s ease;
+        }
+
+        .view-btn.active {
+            color: #f8fafc;
+            background-color: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .view-btn:hover:not(.active) {
+            color: #e2e8f0;
+            background-color: rgba(71, 85, 105, 0.3);
+        }
+
+        /* P&L colors */
+        .pnl-positive {
+            color: #10b981;
+        }
+
+        .pnl-negative {
+            color: #ef4444;
+        }
+
+        .pnl-zero {
+            color: #94a3b8;
+        }
+
+        /* Accessibility */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: #3b82f6;
+            color: white;
+            padding: 8px;
+            text-decoration: none;
+            z-index: 100;
+        }
+
+        .skip-link:focus {
+            top: 0;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(71, 85, 105, 0.8);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 116, 139, 0.9);
+        }
+
+        /* Focus indicators for accessibility */
+        *:focus-visible {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        /* Print styles */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 min-h-screen">
+
+    <!-- Skip to main content (accessibility) -->
+    <a href="#main-content" class="skip-link">
+        Skip to main content
+    </a>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="text-center">
+            <div class="animate-spin w-16 h-16 mx-auto mb-4">
+                <i data-lucide="loader-2" class="w-16 h-16 text-blue-400"></i>
+            </div>
+            <p class="text-white text-xl font-semibold">Loading Simplifyed Dashboard...</p>
+            <p class="text-slate-400 text-sm mt-2">Initializing application</p>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <div id="app" class="hidden"></div>
+
+    <!-- Initialize Lucide Icons -->
+    <script>
+        // Initialize Lucide icons immediately
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+
+        // Hide loading indicator once app is initialized
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loading = document.getElementById('loading');
+                const app = document.getElementById('app');
+
+                if (loading && app) {
+                    loading.style.display = 'none';
+                    app.classList.remove('hidden');
+                    app.classList.add('fade-in');
+                }
+            }, 500); // Short delay for smooth transition
+        });
+
+        // Error handling
+        window.addEventListener('error', (event) => {
+            console.error('Global error:', event.error);
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+        });
+    </script>
+
+    <!-- Load Application (ES6 Module) -->
+    <script type="module" src="/app.js"></script>
+
+    <!-- Development helpers (only in dev mode) -->
+    <script>
+        // Expose helpers for debugging in console
+        window.addEventListener('keydown', (e) => {
+            // Ctrl+Shift+D: Toggle debug mode
+            if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                console.log('=== Debug Info ===');
+                console.log('Store state:', window.store?.getState());
+                console.log('Current route:', window.router?.getCurrentRoute());
+                console.log('App instance:', window.app);
+            }
+
+            // Ctrl+Shift+C: Open developer console view
+            if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                window.router?.navigate('/console');
+            }
+        });
+
+        // Log version info
+        console.log('%cSimplifyed Trading Dashboard', 'color: #3b82f6; font-size: 24px; font-weight: bold;');
+        console.log('%cVersion: 2.0.0 (Component-based)', 'color: #10b981; font-size: 14px;');
+        console.log('%cDevelopment Mode', 'color: #f59e0b; font-size: 12px;');
+        console.log('');
+        console.log('Keyboard shortcuts:');
+        console.log('  Ctrl+Shift+D: Debug info');
+        console.log('  Ctrl+Shift+C: Developer console');
+        console.log('');
+        console.log('Global objects:');
+        console.log('  window.app - Application instance');
+        console.log('  window.store - State management');
+        console.log('  window.router - Client-side router');
+        console.log('  window.API - API service layer');
+    </script>
+
+</body>
+</html>
