@@ -159,6 +159,15 @@ class InstanceService {
       // Normalize updates
       const normalized = this._normalizeInstanceData(updates, true);
 
+      // Broker field is immutable - prevent manual overwrites
+      if (normalized.broker !== undefined) {
+        log.warn('Attempted to update immutable broker field - ignoring', {
+          id,
+          attempted_broker: normalized.broker,
+        });
+        delete normalized.broker;
+      }
+
       // Build update query
       const fields = [];
       const values = [];

@@ -37,6 +37,7 @@ router.get('/search', async (req, res, next) => {
 
       if (marketDataInstances.length === 0) {
         // Fallback to any active instance if no market data instances configured
+        // Prefer healthy instances over unhealthy ones
         const instances = await instanceService.getAllInstances({
           is_active: true,
         });
@@ -45,10 +46,25 @@ router.get('/search', async (req, res, next) => {
           throw new ValidationError('No active instances available for search');
         }
 
-        instance = instances[0];
-        log.debug('Using fallback instance for symbol search (no market data instances)', {
-          instance_id: instance.id,
-        });
+        // Filter for healthy instances first
+        const healthyInstances = instances.filter(
+          (inst) => inst.health_status === 'healthy'
+        );
+
+        if (healthyInstances.length > 0) {
+          instance = healthyInstances[0];
+          log.debug('Using fallback healthy instance for symbol search', {
+            instance_id: instance.id,
+            health_status: instance.health_status,
+          });
+        } else {
+          // Use any active instance if no healthy instances available
+          instance = instances[0];
+          log.warn('Using fallback instance with non-healthy status for symbol search', {
+            instance_id: instance.id,
+            health_status: instance.health_status,
+          });
+        }
       } else {
         instance = marketDataInstances[0];
         log.debug('Using market data instance for symbol search', {

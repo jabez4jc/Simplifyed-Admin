@@ -14,11 +14,12 @@ export async function up(db) {
     ADD COLUMN broker TEXT DEFAULT NULL
   `);
 
-  // Add market_data_role column
+  // Add market_data_role column with CHECK constraint
   // Values: 'none', 'primary', 'secondary'
   await db.run(`
     ALTER TABLE instances
     ADD COLUMN market_data_role TEXT DEFAULT 'none'
+      CHECK(market_data_role IN ('none', 'primary', 'secondary'))
   `);
 
   console.log('  ✅ Added broker and market_data_role columns to instances table');
