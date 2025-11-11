@@ -107,7 +107,7 @@ export function sanitizeEmail(email) {
  * @param {number} defaultValue - Default value if parsing fails
  * @returns {number} - Parsed integer or default
  */
-export function parseInt Safe(value, defaultValue = null) {
+export function parseIntSafe(value, defaultValue = null) {
   const parsed = parseInt(value, 10);
   return isFinite(parsed) ? parsed : defaultValue;
 }

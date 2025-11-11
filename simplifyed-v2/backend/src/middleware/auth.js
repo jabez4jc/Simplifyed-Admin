@@ -6,7 +6,6 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import session from 'express-session';
-import SqliteStore from 'better-sqlite3-session-store';
 import db from '../core/database.js';
 import { config } from '../core/config.js';
 import { log } from '../core/logger.js';
@@ -14,18 +13,25 @@ import { UnauthorizedError, ForbiddenError } from '../core/errors.js';
 
 /**
  * Configure session middleware
+ *
+ * WARNING: Currently uses in-memory session store for development.
+ * For production deployments:
+ * - Sessions will be lost on server restart
+ * - Multi-instance deployments will have inconsistent sessions
+ *
+ * Production alternatives:
+ * - connect-sqlite3 for single-instance deployments
+ * - connect-redis for multi-instance deployments
+ * - @quixo3/prisma-session-store for existing Prisma setups
  */
 export function configureSession() {
-  const SessionStore = SqliteStore(session);
+  // TODO: Implement persistent session store for production
+  // Use environment variable to select store type
+  if (config.env === 'production') {
+    log.warn('Using in-memory session store in production - sessions will not persist across restarts');
+  }
 
   return session({
-    store: new SessionStore({
-      client: db.db, // Better-sqlite3 instance
-      expired: {
-        clear: true,
-        intervalMs: 900000, // 15 minutes
-      },
-    }),
     secret: config.session.secret,
     resave: false,
     saveUninitialized: false,
@@ -52,6 +58,13 @@ export function configurePassport() {
         },
         async (accessToken, refreshToken, profile, done) => {
           try {
+            // Validate email exists in profile
+            if (!profile.emails || profile.emails.length === 0) {
+              const error = new Error('No email address found in Google profile');
+              log.error('OAuth profile missing email', { profileId: profile.id });
+              return done(error);
+            }
+
             const email = profile.emails[0].value;
 
             // Check if user exists

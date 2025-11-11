@@ -96,7 +96,7 @@ export function validateOrderRequest(data, endpoint) {
   }
 
   // Validate price (for LIMIT orders)
-  if (data.pricetype === 'LIMIT' && data.price) {
+  if (validated.pricetype === 'LIMIT' && data.price) {
     const price = parseFloat(data.price);
     if (isNaN(price) || price <= 0) {
       errors.push({
@@ -108,7 +108,7 @@ export function validateOrderRequest(data, endpoint) {
   }
 
   // Validate trigger_price (for SL orders)
-  if (['SL', 'SL-M'].includes(data.pricetype) && data.trigger_price) {
+  if (['SL', 'SL-M'].includes(validated.pricetype) && data.trigger_price) {
     const triggerPrice = parseFloat(data.trigger_price);
     if (isNaN(triggerPrice) || triggerPrice <= 0) {
       errors.push({

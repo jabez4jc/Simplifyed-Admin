@@ -13,6 +13,28 @@ import { NotFoundError } from '../../core/errors.js';
 const router = express.Router();
 
 /**
+ * GET /api/v1/positions/aggregate/pnl
+ * Get aggregated P&L across all active instances
+ * NOTE: Must be before /:instanceId routes to avoid capturing "aggregate" as instanceId
+ */
+router.get('/aggregate/pnl', async (req, res, next) => {
+  try {
+    const instances = await instanceService.getAllInstances({
+      is_active: true,
+    });
+
+    const aggregatedPnL = await pnlService.getAggregatedPnL(instances);
+
+    res.json({
+      status: 'success',
+      data: aggregatedPnL,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /api/v1/positions/:instanceId
  * Get positions for an instance
  */
@@ -48,27 +70,6 @@ router.get('/:instanceId/pnl', async (req, res, next) => {
     res.json({
       status: 'success',
       data: pnl,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * GET /api/v1/positions/aggregate/pnl
- * Get aggregated P&L across all active instances
- */
-router.get('/aggregate/pnl', async (req, res, next) => {
-  try {
-    const instances = await instanceService.getAllInstances({
-      is_active: true,
-    });
-
-    const aggregatedPnL = await pnlService.getAggregatedPnL(instances);
-
-    res.json({
-      status: 'success',
-      data: aggregatedPnL,
     });
   } catch (error) {
     next(error);

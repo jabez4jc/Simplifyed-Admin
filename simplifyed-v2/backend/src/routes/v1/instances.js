@@ -48,6 +48,24 @@ router.get('/', async (req, res, next) => {
 });
 
 /**
+ * GET /api/v1/instances/admin/instances
+ * Get admin instances (primary and secondary)
+ * NOTE: Must be before /:id route to avoid capturing "admin" as id
+ */
+router.get('/admin/instances', async (req, res, next) => {
+  try {
+    const adminInstances = await instanceService.getAdminInstances();
+
+    res.json({
+      status: 'success',
+      data: adminInstances,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /api/v1/instances/:id
  * Get instance by ID
  */
@@ -196,23 +214,6 @@ router.post('/:id/analyzer/toggle', async (req, res, next) => {
       status: 'success',
       message: `Analyzer mode ${mode ? 'enabled' : 'disabled'} successfully`,
       data: instance,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * GET /api/v1/instances/admin
- * Get admin instances (primary and secondary)
- */
-router.get('/admin/instances', async (req, res, next) => {
-  try {
-    const adminInstances = await instanceService.getAdminInstances();
-
-    res.json({
-      status: 'success',
-      data: adminInstances,
     });
   } catch (error) {
     next(error);
