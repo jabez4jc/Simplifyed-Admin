@@ -16,7 +16,7 @@ const __dirname = dirname(__filename);
 
 import { configureAuth, setupAuthRoutes, requireAuth } from './auth.js';
 import { updateInstancesData as updater_updateInstancesData, performHealthChecks as updater_performHealthChecks } from './lib/instance-updater.js';
-import watchlistRoutes from './routes/watchlist.js';
+import watchlistRoutes from './routes/watchlist/index.js';
 import symbolRoutes from './routes/symbols.js';
 import symbolSearchRoutes from './routes/symbol-search.js';
 import instanceConfigRoutes from './routes/instance-config.js';
