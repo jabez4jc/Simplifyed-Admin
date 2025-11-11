@@ -176,6 +176,86 @@ class DashboardLayout extends Component {
   }
 
   /**
+   * Load dashboard view (placeholder for Phase 3c)
+   */
+  loadDashboardView() {
+    this.showPlaceholder('dashboard', 'Dashboard', 'bar-chart-3', 'Real-time P&L tracking and instance monitoring');
+  }
+
+  /**
+   * Load instances view (placeholder for Phase 3c)
+   */
+  loadInstancesView() {
+    this.showPlaceholder('instances', 'Instances', 'server', 'Manage trading instances and configurations');
+  }
+
+  /**
+   * Load watchlists view (placeholder for Phase 3c)
+   */
+  loadWatchlistsView() {
+    this.showPlaceholder('watchlists', 'Watchlists', 'list', 'Create and manage symbol watchlists');
+  }
+
+  /**
+   * Load options trading view (placeholder for Phase 3c)
+   */
+  loadOptionsView() {
+    this.showPlaceholder('options', 'Options Trading', 'trending-up', 'Options chain and order placement');
+  }
+
+  /**
+   * Load developer console view (placeholder for Phase 3c)
+   */
+  loadConsoleView() {
+    this.showPlaceholder('console', 'Developer Console', 'terminal', 'API logs and debugging tools');
+  }
+
+  /**
+   * Show placeholder view for incomplete components
+   */
+  showPlaceholder(view, title, icon, description) {
+    const viewContainer = this.element.querySelector('#view-container');
+    if (!viewContainer) return;
+
+    // Destroy previous view
+    if (this.currentViewComponent) {
+      this.currentViewComponent.destroy();
+      this.currentViewComponent = null;
+    }
+
+    viewContainer.innerHTML = `
+      <div class="flex items-center justify-center min-h-[60vh]">
+        <div class="text-center max-w-md">
+          <div class="w-24 h-24 bg-slate-800/50 border border-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <i data-lucide="${icon}" class="w-12 h-12 text-blue-400"></i>
+          </div>
+          <h2 class="text-3xl font-bold text-white mb-3">${title}</h2>
+          <p class="text-slate-400 text-lg mb-6">${description}</p>
+          <div class="inline-flex items-center space-x-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+            <i data-lucide="code" class="w-4 h-4 text-blue-400"></i>
+            <span class="text-blue-300 text-sm font-medium">Component Migration - Phase 3c</span>
+          </div>
+          <div class="mt-8 text-left bg-slate-800/30 border border-slate-700/50 rounded-lg p-4">
+            <p class="text-slate-300 text-sm mb-2">
+              <strong>Status:</strong> Foundation complete, feature components pending
+            </p>
+            <p class="text-slate-400 text-xs">
+              Phase 3a (State & API) ✅ Complete<br>
+              Phase 3b (Router & Layout) ✅ Complete<br>
+              Phase 3c (Feature Components) 🚧 In Progress
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Initialize Lucide icons
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+  }
+
+  /**
    * Show loading state
    */
   showLoading() {
