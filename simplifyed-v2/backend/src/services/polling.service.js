@@ -365,10 +365,13 @@ class PollingService {
         symbolsByExchange
       )) {
         try {
-          // OpenAlgo quotes endpoint expects comma-separated symbols
-          const symbolList = exchangeSymbols.join(',');
+          // Prepare symbols array for getQuotes API
+          const symbolsArray = exchangeSymbols.map(symbol => ({
+            exchange,
+            symbol
+          }));
 
-          const quotes = await openalgoClient.getQuotes(instance, symbolList);
+          const quotes = await openalgoClient.getQuotes(instance, symbolsArray);
 
           // Update market_data table
           for (const quote of quotes) {
