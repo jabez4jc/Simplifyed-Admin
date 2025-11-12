@@ -240,6 +240,7 @@ class WatchlistService {
           exchange: symbol.exchange,
           symbol: symbol.symbol,
           token: symbol.token,
+          lot_size: symbol.lot_size,
           qty_type: symbol.qty_type,
           qty_value: symbol.qty_value,
           product_type: symbol.product_type,
@@ -250,6 +251,16 @@ class WatchlistService {
           sl_value: symbol.sl_value,
           max_position_size: symbol.max_position_size,
           is_enabled: symbol.is_enabled,
+          // Symbol metadata fields
+          symbol_type: symbol.symbol_type,
+          expiry: symbol.expiry,
+          strike: symbol.strike,
+          option_type: symbol.option_type,
+          instrumenttype: symbol.instrumenttype,
+          name: symbol.name,
+          tick_size: symbol.tick_size,
+          brsymbol: symbol.brsymbol,
+          brexchange: symbol.brexchange,
         });
       }
 

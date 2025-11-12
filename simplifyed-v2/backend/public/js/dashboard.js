@@ -80,6 +80,11 @@ class DashboardApp {
    * Load view
    */
   async loadView(viewName) {
+    // Clean up watchlist pollers when leaving watchlists view
+    if (this.currentView === 'watchlists' && viewName !== 'watchlists') {
+      this.stopAllWatchlistPolling();
+    }
+
     this.currentView = viewName;
 
     // Update title
@@ -555,6 +560,16 @@ class DashboardApp {
   }
 
   /**
+   * Stop all watchlist polling intervals
+   */
+  stopAllWatchlistPolling() {
+    this.watchlistPollers.forEach((intervalId, watchlistId) => {
+      clearInterval(intervalId);
+    });
+    this.watchlistPollers.clear();
+  }
+
+  /**
    * Update quotes for all symbols in a watchlist
    */
   async updateWatchlistQuotes(watchlistId) {
@@ -565,15 +580,15 @@ class DashboardApp {
 
       if (symbols.length === 0) return;
 
-      // Get the watchlist's instances to find which one to use for quotes
-      const watchlist = this.watchlists.find(w => w.id === watchlistId);
-      if (!watchlist || !watchlist.instances || watchlist.instances.length === 0) {
-        console.warn('No instances assigned to watchlist', watchlistId);
+      // Use the first available active instance for quotes
+      const activeInstance = this.instances.find(i => i.is_active && i.health_status === 'healthy');
+      if (!activeInstance) {
+        console.warn('No active instances available for quotes');
         return;
       }
 
-      // Use the first instance for quotes
-      const instanceId = watchlist.instances[0].id;
+      // Use the active instance for quotes
+      const instanceId = activeInstance.id;
 
       // Prepare symbols array for quotes API
       const symbolsForQuotes = symbols.map(s => ({
