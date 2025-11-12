@@ -94,8 +94,26 @@ class SymbolValidationService {
     const cached = await this._getCachedSymbol(symbol, exchange);
     if (cached && this._isCacheValid(cached.cached_at)) {
       log.debug('Using cached symbol', { symbol, exchange });
+
+      // Transform snake_case database fields to camelCase for frontend
       return {
-        ...cached,
+        symbol: cached.symbol,
+        exchange: cached.exchange,
+        token: cached.token,
+        name: cached.name,
+        instrumenttype: cached.instrumenttype,
+        lotsize: cached.lotsize,
+        tick_size: cached.tick_size,
+        tickSize: cached.tick_size, // Alias for camelCase consistency
+        expiry: cached.expiry,
+        strike: cached.strike,
+        option_type: cached.option_type,
+        optionType: cached.option_type, // Alias for camelCase consistency
+        brsymbol: cached.brsymbol,
+        brexchange: cached.brexchange,
+        symbol_type: cached.symbol_type,
+        symbolType: cached.symbol_type, // Alias for camelCase consistency
+        cachedAt: cached.cached_at, // Transform cached_at to cachedAt
         from_cache: true,
       };
     }
@@ -187,7 +205,7 @@ class SymbolValidationService {
     // Rule 3: Futures
     if (
       instrumenttype.startsWith('FUT') ||
-      (expiry && (strike <= 0 || !strike)) ||
+      (expiry && strike <= 0) ||
       symbolName.endsWith('FUT')
     ) {
       return SymbolType.FUTURES;
