@@ -640,9 +640,9 @@ class DashboardApp {
       ltpCell.innerHTML = `<span class="font-medium">₹${Utils.formatNumber(quote.ltp)}</span>`;
     }
 
-    // Calculate and display % change
-    if (quote.ltp !== undefined && quote.open !== undefined && quote.open > 0) {
-      const changePercent = ((quote.ltp - quote.open) / quote.open) * 100;
+    // Calculate and display % change (from previous close)
+    if (quote.ltp !== undefined && quote.prev_close !== undefined && quote.prev_close > 0) {
+      const changePercent = ((quote.ltp - quote.prev_close) / quote.prev_close) * 100;
       const changeClass = changePercent >= 0 ? 'text-profit' : 'text-loss';
       const changeSymbol = changePercent >= 0 ? '+' : '';
       changeCell.innerHTML = `<span class="${changeClass} font-medium">${changeSymbol}${changePercent.toFixed(2)}%</span>`;
