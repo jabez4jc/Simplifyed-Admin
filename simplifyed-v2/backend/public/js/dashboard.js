@@ -444,12 +444,15 @@ class DashboardApp {
       this.stopWatchlistPolling(watchlistId);
     } else {
       this.expandedWatchlists.add(watchlistId);
-      // Start polling for this watchlist
-      this.startWatchlistPolling(watchlistId);
     }
 
-    // Re-render watchlists
+    // Re-render watchlists first to ensure DOM is ready
     await this.renderWatchlistsView();
+
+    // Start polling after DOM is rendered
+    if (this.expandedWatchlists.has(watchlistId)) {
+      this.startWatchlistPolling(watchlistId);
+    }
   }
 
   /**
