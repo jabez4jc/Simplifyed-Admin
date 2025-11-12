@@ -402,10 +402,31 @@ class OpenAlgoClient {
    * @returns {Promise<Array>} - Quotes list
    */
   async getQuotes(instance, symbols) {
-    const response = await this.request(instance, 'quotes', {
-      symbols,
+    // OpenAlgo quotes API expects one symbol at a time
+    // Make parallel requests for all symbols
+    const quotePromises = symbols.map(async ({ exchange, symbol }) => {
+      try {
+        const response = await this.request(instance, 'quotes', {
+          exchange,
+          symbol,
+        });
+
+        // Return quote data with exchange and symbol for matching
+        return {
+          exchange,
+          symbol,
+          ...response.data,
+        };
+      } catch (error) {
+        log.warn('Failed to fetch quote', error, { exchange, symbol });
+        return null;
+      }
     });
-    return response.data || [];
+
+    const results = await Promise.all(quotePromises);
+
+    // Filter out failed requests
+    return results.filter(quote => quote !== null);
   }
 
   /**
