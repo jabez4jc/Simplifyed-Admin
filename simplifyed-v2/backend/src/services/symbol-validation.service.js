@@ -331,10 +331,21 @@ class SymbolValidationService {
   _isCacheValid(cachedAt) {
     if (!cachedAt) return false;
 
-    const cacheTime = new Date(cachedAt).getTime();
-    const now = Date.now();
+    // Convert SQLite timestamp (YYYY-MM-DD HH:MM:SS) to ISO format for parsing
+    // SQLite timestamps don't parse correctly in Node.js and Safari without conversion
+    const isoTimestamp = cachedAt.includes('T')
+      ? cachedAt
+      : `${cachedAt.replace(' ', 'T')}Z`;
 
-    return (now - cacheTime) < CACHE_TTL_MS;
+    const cacheTime = Date.parse(isoTimestamp);
+
+    // Validate parsed timestamp
+    if (Number.isNaN(cacheTime)) {
+      log.warn('Invalid cached_at timestamp format', { cachedAt });
+      return false;
+    }
+
+    return (Date.now() - cacheTime) < CACHE_TTL_MS;
   }
 
   /**
