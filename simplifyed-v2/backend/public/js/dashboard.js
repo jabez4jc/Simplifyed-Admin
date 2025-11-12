@@ -495,10 +495,11 @@ class DashboardApp {
    */
   getSymbolTypeBadgeClass(type) {
     const classes = {
-      EQUITY: 'badge-info',
-      FUTURES: 'badge-warning',
-      OPTIONS: 'badge-success',
-      UNKNOWN: 'badge-neutral',
+      INDEX: 'badge-primary',    // Indices - cannot be traded directly
+      EQUITY: 'badge-info',       // Equity stocks
+      FUTURES: 'badge-warning',   // Futures contracts
+      OPTIONS: 'badge-success',   // Options contracts
+      UNKNOWN: 'badge-neutral',   // Unknown/unclassified
     };
     return classes[type] || 'badge-neutral';
   }

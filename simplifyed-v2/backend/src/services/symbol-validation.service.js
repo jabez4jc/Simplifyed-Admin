@@ -13,6 +13,7 @@ import { ValidationError } from '../core/errors.js';
  * Symbol classification types
  */
 export const SymbolType = {
+  INDEX: 'INDEX',
   EQUITY: 'EQUITY',
   FUTURES: 'FUTURES',
   OPTIONS: 'OPTIONS',
@@ -174,9 +175,12 @@ class SymbolValidationService {
    * Classify symbol based on OpenAlgo instrumenttype and metadata
    *
    * Deterministic classification rule:
+   * 0. If exchange is NSE_INDEX or BSE_INDEX → Index (cannot be traded directly, only derivatives)
    * 1. If instrumenttype is EQ → Equity
    * 2. Else if instrumenttype starts with OPT OR (expiry non-empty AND strike > 0 AND symbol ends with CE/PE) → Options
    * 3. Else if instrumenttype starts with FUT OR (expiry non-empty AND strike ≤ 0 or missing) → Futures
+   *
+   * Note: Index symbols serve as underlyings for F&O contracts. The 'name' field links derivatives to their underlying.
    *
    * @param {Object} symbol - Symbol object with instrumenttype, expiry, strike, etc.
    * @returns {string} - SymbolType constant
@@ -184,8 +188,15 @@ class SymbolValidationService {
   classifySymbol(symbol) {
     const instrumenttype = (symbol.instrumenttype || '').toUpperCase();
     const symbolName = (symbol.symbol || symbol.tradingsymbol || '').toUpperCase();
+    const exchange = (symbol.exchange || '').toUpperCase();
     const expiry = symbol.expiry;
     const strike = parseFloat(symbol.strike) || 0;
+
+    // Rule 0: Index (NSE_INDEX or BSE_INDEX exchanges)
+    // Index symbols cannot be traded directly but serve as underlyings for F&O
+    if (exchange === 'NSE_INDEX' || exchange === 'BSE_INDEX') {
+      return SymbolType.INDEX;
+    }
 
     // Rule 1: Equity
     if (instrumenttype === 'EQ' || instrumenttype === 'EQUITY') {
@@ -212,7 +223,6 @@ class SymbolValidationService {
     }
 
     // Fallback: check exchange for F&O hints
-    const exchange = (symbol.exchange || '').toUpperCase();
     if (exchange === 'NFO' || exchange === 'BFO') {
       // F&O exchanges, but couldn't determine specific type
       if (symbolName.endsWith('CE') || symbolName.endsWith('PE')) {
