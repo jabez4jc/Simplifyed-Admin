@@ -10,6 +10,8 @@ class DashboardApp {
     this.instances = [];
     this.watchlists = [];
     this.pollingInterval = null;
+    // Track watchlist quote polling intervals
+    this.watchlistPollers = new Map();
   }
 
   /**
@@ -433,8 +435,12 @@ class DashboardApp {
   async toggleWatchlist(watchlistId) {
     if (this.expandedWatchlists.has(watchlistId)) {
       this.expandedWatchlists.delete(watchlistId);
+      // Stop polling for this watchlist
+      this.stopWatchlistPolling(watchlistId);
     } else {
       this.expandedWatchlists.add(watchlistId);
+      // Start polling for this watchlist
+      this.startWatchlistPolling(watchlistId);
     }
 
     // Re-render watchlists
@@ -454,19 +460,24 @@ class DashboardApp {
       }
 
       return `
-        <table class="table">
+        <table class="table" id="watchlist-table-${watchlistId}">
           <thead>
             <tr>
               <th>Symbol</th>
               <th>Exchange</th>
               <th>Type</th>
+              <th>Expiry</th>
+              <th>Strike</th>
               <th>Lot Size</th>
+              <th>LTP</th>
+              <th>Change %</th>
+              <th>Volume</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             ${symbols.map(sym => `
-              <tr>
+              <tr data-symbol-id="${sym.id}" data-symbol="${sym.symbol}" data-exchange="${sym.exchange}">
                 <td class="font-medium">${Utils.escapeHTML(sym.symbol)}</td>
                 <td>${Utils.escapeHTML(sym.exchange)}</td>
                 <td>
@@ -474,7 +485,18 @@ class DashboardApp {
                     ${sym.symbol_type || 'UNKNOWN'}
                   </span>
                 </td>
-                <td>${sym.lotsize || 1}</td>
+                <td class="text-sm">${sym.expiry ? Utils.escapeHTML(sym.expiry) : '-'}</td>
+                <td class="text-sm">${sym.strike ? sym.strike : '-'}</td>
+                <td>${sym.lot_size || 1}</td>
+                <td class="ltp-cell" data-symbol-id="${sym.id}">
+                  <span class="text-neutral-500">-</span>
+                </td>
+                <td class="change-cell" data-symbol-id="${sym.id}">
+                  <span class="text-neutral-500">-</span>
+                </td>
+                <td class="volume-cell" data-symbol-id="${sym.id}">
+                  <span class="text-neutral-500">-</span>
+                </td>
                 <td>
                   <button class="btn btn-error btn-sm" onclick="app.removeSymbol(${watchlistId}, ${sym.id})">
                     Remove
@@ -502,6 +524,116 @@ class DashboardApp {
       UNKNOWN: 'badge-neutral',   // Unknown/unclassified
     };
     return classes[type] || 'badge-neutral';
+  }
+
+  /**
+   * Start polling quotes for a watchlist
+   */
+  async startWatchlistPolling(watchlistId) {
+    // Stop existing poller if any
+    this.stopWatchlistPolling(watchlistId);
+
+    // Fetch quotes immediately
+    await this.updateWatchlistQuotes(watchlistId);
+
+    // Start 10-second polling
+    const intervalId = setInterval(async () => {
+      await this.updateWatchlistQuotes(watchlistId);
+    }, 10000);
+
+    this.watchlistPollers.set(watchlistId, intervalId);
+  }
+
+  /**
+   * Stop polling quotes for a watchlist
+   */
+  stopWatchlistPolling(watchlistId) {
+    if (this.watchlistPollers.has(watchlistId)) {
+      clearInterval(this.watchlistPollers.get(watchlistId));
+      this.watchlistPollers.delete(watchlistId);
+    }
+  }
+
+  /**
+   * Update quotes for all symbols in a watchlist
+   */
+  async updateWatchlistQuotes(watchlistId) {
+    try {
+      // Get watchlist symbols
+      const response = await api.getWatchlistSymbols(watchlistId);
+      const symbols = response.data;
+
+      if (symbols.length === 0) return;
+
+      // Get the watchlist's instances to find which one to use for quotes
+      const watchlist = this.watchlists.find(w => w.id === watchlistId);
+      if (!watchlist || !watchlist.instances || watchlist.instances.length === 0) {
+        console.warn('No instances assigned to watchlist', watchlistId);
+        return;
+      }
+
+      // Use the first instance for quotes
+      const instanceId = watchlist.instances[0].id;
+
+      // Prepare symbols array for quotes API
+      const symbolsForQuotes = symbols.map(s => ({
+        exchange: s.exchange,
+        symbol: s.symbol
+      }));
+
+      // Fetch quotes
+      const quotesResponse = await api.getQuotes(symbolsForQuotes, instanceId);
+      const quotes = quotesResponse.data;
+
+      // Update UI for each symbol
+      quotes.forEach(quote => {
+        const symbol = symbols.find(s =>
+          s.exchange === quote.exchange && s.symbol === quote.symbol
+        );
+
+        if (symbol) {
+          this.updateSymbolQuote(watchlistId, symbol.id, quote);
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update watchlist quotes', error);
+    }
+  }
+
+  /**
+   * Update quote display for a specific symbol
+   */
+  updateSymbolQuote(watchlistId, symbolId, quote) {
+    // Find the table cells for this symbol
+    const ltpCell = document.querySelector(
+      `#watchlist-table-${watchlistId} .ltp-cell[data-symbol-id="${symbolId}"]`
+    );
+    const changeCell = document.querySelector(
+      `#watchlist-table-${watchlistId} .change-cell[data-symbol-id="${symbolId}"]`
+    );
+    const volumeCell = document.querySelector(
+      `#watchlist-table-${watchlistId} .volume-cell[data-symbol-id="${symbolId}"]`
+    );
+
+    if (!ltpCell || !changeCell || !volumeCell) return;
+
+    // Update LTP
+    if (quote.ltp !== undefined) {
+      ltpCell.innerHTML = `<span class="font-medium">₹${Utils.formatNumber(quote.ltp)}</span>`;
+    }
+
+    // Calculate and display % change
+    if (quote.ltp !== undefined && quote.open !== undefined && quote.open > 0) {
+      const changePercent = ((quote.ltp - quote.open) / quote.open) * 100;
+      const changeClass = changePercent >= 0 ? 'text-profit' : 'text-loss';
+      const changeSymbol = changePercent >= 0 ? '+' : '';
+      changeCell.innerHTML = `<span class="${changeClass} font-medium">${changeSymbol}${changePercent.toFixed(2)}%</span>`;
+    }
+
+    // Update volume
+    if (quote.volume !== undefined) {
+      volumeCell.innerHTML = `<span>${Utils.formatNumber(quote.volume)}</span>`;
+    }
   }
 
   /**
@@ -1100,13 +1232,21 @@ class DashboardApp {
     try {
       Utils.showToast('Adding symbol...', 'info');
 
-      // Add symbol to watchlist
+      // Add symbol to watchlist with complete metadata
       await api.addSymbol(this.currentWatchlistId, {
         symbol: symbolData.tradingsymbol || symbolData.symbol,
         exchange: symbolData.exchange,
         token: symbolData.token,
         lotsize: symbolData.lotsize || 1,
         symbol_type: symbolData.symbol_type,
+        expiry: symbolData.expiry || null,
+        strike: symbolData.strike || null,
+        option_type: symbolData.option_type || null,
+        instrumenttype: symbolData.instrumenttype || null,
+        name: symbolData.name || null,
+        tick_size: symbolData.tick_size || symbolData.tickSize || null,
+        brsymbol: symbolData.brsymbol || null,
+        brexchange: symbolData.brexchange || null,
       });
 
       Utils.showToast('Symbol added successfully', 'success');
