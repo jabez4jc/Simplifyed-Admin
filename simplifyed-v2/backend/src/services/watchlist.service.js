@@ -240,6 +240,7 @@ class WatchlistService {
           exchange: symbol.exchange,
           symbol: symbol.symbol,
           token: symbol.token,
+          lot_size: symbol.lot_size,
           qty_type: symbol.qty_type,
           qty_value: symbol.qty_value,
           product_type: symbol.product_type,
@@ -250,6 +251,16 @@ class WatchlistService {
           sl_value: symbol.sl_value,
           max_position_size: symbol.max_position_size,
           is_enabled: symbol.is_enabled,
+          // Symbol metadata fields
+          symbol_type: symbol.symbol_type,
+          expiry: symbol.expiry,
+          strike: symbol.strike,
+          option_type: symbol.option_type,
+          instrumenttype: symbol.instrumenttype,
+          name: symbol.name,
+          tick_size: symbol.tick_size,
+          brsymbol: symbol.brsymbol,
+          brexchange: symbol.brexchange,
         });
       }
 
@@ -304,16 +315,19 @@ class WatchlistService {
       // Insert symbol
       const result = await db.run(
         `INSERT INTO watchlist_symbols (
-          watchlist_id, exchange, symbol, token,
+          watchlist_id, exchange, symbol, token, lot_size,
           qty_type, qty_value, product_type, order_type,
           target_type, target_value, sl_type, sl_value,
-          max_position_size, is_enabled
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          max_position_size, is_enabled,
+          symbol_type, expiry, strike, option_type,
+          instrumenttype, name, tick_size, brsymbol, brexchange
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           watchlistId,
           normalized.exchange,
           normalized.symbol,
           normalized.token,
+          normalized.lot_size || 1,
           normalized.qty_type,
           normalized.qty_value,
           normalized.product_type,
@@ -324,6 +338,15 @@ class WatchlistService {
           normalized.sl_value,
           normalized.max_position_size,
           normalized.is_enabled ? 1 : 0,
+          normalized.symbol_type || null,
+          normalized.expiry || null,
+          normalized.strike || null,
+          normalized.option_type || null,
+          normalized.instrumenttype || null,
+          normalized.name || null,
+          normalized.tick_size || null,
+          normalized.brsymbol || null,
+          normalized.brexchange || null,
         ]
       );
 
@@ -705,6 +728,54 @@ class WatchlistService {
     // Is enabled
     if (data.is_enabled !== undefined) {
       normalized.is_enabled = parseBooleanSafe(data.is_enabled, true);
+    }
+
+    // Symbol metadata (from symbol validation/search API)
+    if (data.symbol_type !== undefined) {
+      const symbolType = sanitizeString(data.symbol_type).toUpperCase();
+      if (['EQUITY', 'FUTURES', 'OPTIONS', 'INDEX', 'UNKNOWN'].includes(symbolType)) {
+        normalized.symbol_type = symbolType;
+      }
+    }
+
+    if (data.expiry !== undefined) {
+      normalized.expiry = sanitizeString(data.expiry) || null;
+    }
+
+    if (data.strike !== undefined) {
+      normalized.strike = parseFloatSafe(data.strike, null);
+    }
+
+    if (data.option_type !== undefined) {
+      const optionType = sanitizeString(data.option_type).toUpperCase();
+      if (['CE', 'PE', ''].includes(optionType)) {
+        normalized.option_type = optionType || null;
+      }
+    }
+
+    if (data.instrumenttype !== undefined) {
+      normalized.instrumenttype = sanitizeString(data.instrumenttype) || null;
+    }
+
+    if (data.name !== undefined) {
+      normalized.name = sanitizeString(data.name) || null;
+    }
+
+    if (data.lotsize !== undefined || data.lot_size !== undefined) {
+      const lotsize = parseIntSafe(data.lotsize || data.lot_size, 1);
+      normalized.lot_size = lotsize > 0 ? lotsize : 1;
+    }
+
+    if (data.tick_size !== undefined || data.tickSize !== undefined) {
+      normalized.tick_size = parseFloatSafe(data.tick_size || data.tickSize, null);
+    }
+
+    if (data.brsymbol !== undefined) {
+      normalized.brsymbol = sanitizeString(data.brsymbol) || null;
+    }
+
+    if (data.brexchange !== undefined) {
+      normalized.brexchange = sanitizeString(data.brexchange) || null;
     }
 
     if (errors.length > 0) {

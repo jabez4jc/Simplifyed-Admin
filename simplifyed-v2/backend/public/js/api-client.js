@@ -286,9 +286,17 @@ class APIClient {
     });
   }
 
+  /**
+   * Get quotes for multiple symbols
+   * @param {Array<{exchange: string, symbol: string}>} symbols - Array of symbol objects
+   * @param {number} instanceId - Instance ID to fetch quotes from
+   * @returns {Promise<Object>} - Quotes data
+   */
   async getQuotes(symbols, instanceId) {
-    const params = new URLSearchParams({ symbols, instanceId });
-    return this.request(`/symbols/quotes?${params}`);
+    return this.request('/symbols/quotes', {
+      method: 'POST',
+      body: { symbols, instanceId },
+    });
   }
 
   async getMarketData(exchange, symbol) {

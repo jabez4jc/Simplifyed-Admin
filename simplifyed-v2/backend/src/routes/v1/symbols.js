@@ -74,15 +74,16 @@ router.post('/validate', async (req, res, next) => {
 });
 
 /**
- * GET /api/v1/symbols/quotes
- * Get quotes for symbols
+ * POST /api/v1/symbols/quotes
+ * Get quotes for multiple symbols
+ * Body: { symbols: [{exchange, symbol}], instanceId }
  */
-router.get('/quotes', async (req, res, next) => {
+router.post('/quotes', async (req, res, next) => {
   try {
-    const { symbols, instanceId } = req.query;
+    const { symbols, instanceId } = req.body;
 
-    if (!symbols) {
-      throw new ValidationError('symbols parameter is required');
+    if (!symbols || !Array.isArray(symbols)) {
+      throw new ValidationError('symbols array is required');
     }
 
     if (!instanceId) {
