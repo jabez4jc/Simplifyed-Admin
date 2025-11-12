@@ -27,23 +27,28 @@ class OpenAlgoClient {
     const rejectUnauthorized = process.env.PROXY_TLS_REJECT_UNAUTHORIZED !== 'false';
 
     if (proxyUrl) {
-      // Parse URL to safely extract host info without credentials
-      const proxyUrlObj = new URL(proxyUrl);
-      log.info('Using proxy for OpenAlgo requests', {
-        proxy: `${proxyUrlObj.protocol}//${proxyUrlObj.host}`,
-        tlsVerification: rejectUnauthorized
-      });
+      try {
+        // Parse URL to safely extract host info without credentials
+        const proxyUrlObj = new URL(proxyUrl);
+        log.info('Using proxy for OpenAlgo requests', {
+          proxy: `${proxyUrlObj.protocol}//${proxyUrlObj.host}`,
+          tlsVerification: rejectUnauthorized
+        });
 
-      if (!rejectUnauthorized) {
-        log.warn('TLS certificate verification is DISABLED for proxy connections. Use only in development!');
+        if (!rejectUnauthorized) {
+          log.warn('TLS certificate verification is DISABLED for proxy connections. Use only in development!');
+        }
+
+        this.dispatcher = new ProxyAgent({
+          uri: proxyUrl,
+          requestTls: {
+            rejectUnauthorized,
+          },
+        });
+      } catch (error) {
+        log.error('Invalid proxy URL, proceeding without proxy', { error: error.message });
+        this.dispatcher = null;
       }
-
-      this.dispatcher = new ProxyAgent({
-        uri: proxyUrl,
-        requestTls: {
-          rejectUnauthorized,
-        },
-      });
     } else {
       log.info('No proxy configured for OpenAlgo requests');
       this.dispatcher = null;
