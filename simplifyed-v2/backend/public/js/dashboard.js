@@ -12,6 +12,9 @@ class DashboardApp {
     this.pollingInterval = null;
     // Track watchlist quote polling intervals
     this.watchlistPollers = new Map();
+    // Cache for quote data to prevent unnecessary DOM updates
+    // Structure: { watchlistId_symbolId: { ltp, changePercent, volume } }
+    this.quoteCache = new Map();
   }
 
   /**
@@ -560,6 +563,8 @@ class DashboardApp {
       clearInterval(this.watchlistPollers.get(watchlistId));
       this.watchlistPollers.delete(watchlistId);
     }
+    // Clear quote cache for this watchlist
+    this.clearWatchlistQuoteCache(watchlistId);
   }
 
   /**
@@ -570,6 +575,22 @@ class DashboardApp {
       clearInterval(intervalId);
     });
     this.watchlistPollers.clear();
+    // Clear all quote caches
+    this.quoteCache.clear();
+  }
+
+  /**
+   * Clear quote cache for a specific watchlist
+   */
+  clearWatchlistQuoteCache(watchlistId) {
+    // Remove all cache entries for this watchlist
+    const keysToDelete = [];
+    for (const key of this.quoteCache.keys()) {
+      if (key.startsWith(`${watchlistId}_`)) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach(key => this.quoteCache.delete(key));
   }
 
   /**
@@ -620,6 +641,7 @@ class DashboardApp {
 
   /**
    * Update quote display for a specific symbol
+   * Uses caching to prevent unnecessary DOM updates
    */
   updateSymbolQuote(watchlistId, symbolId, quote) {
     // Find the table cells for this symbol
@@ -635,23 +657,38 @@ class DashboardApp {
 
     if (!ltpCell || !changeCell || !volumeCell) return;
 
-    // Update LTP
-    if (quote.ltp !== undefined) {
-      ltpCell.innerHTML = `<span class="font-medium">₹${Utils.formatNumber(quote.ltp)}</span>`;
+    // Create cache key
+    const cacheKey = `${watchlistId}_${symbolId}`;
+    const cached = this.quoteCache.get(cacheKey) || {};
+
+    // Calculate change percent
+    let changePercent = null;
+    if (quote.ltp !== undefined && quote.prev_close !== undefined && quote.prev_close > 0) {
+      changePercent = ((quote.ltp - quote.prev_close) / quote.prev_close) * 100;
     }
 
-    // Calculate and display % change (from previous close)
-    if (quote.ltp !== undefined && quote.prev_close !== undefined && quote.prev_close > 0) {
-      const changePercent = ((quote.ltp - quote.prev_close) / quote.prev_close) * 100;
+    // Update LTP only if changed
+    if (quote.ltp !== undefined && cached.ltp !== quote.ltp) {
+      ltpCell.innerHTML = `<span class="font-medium">₹${Utils.formatNumber(quote.ltp)}</span>`;
+      cached.ltp = quote.ltp;
+    }
+
+    // Update % change only if changed
+    if (changePercent !== null && cached.changePercent !== changePercent) {
       const changeClass = changePercent >= 0 ? 'text-profit' : 'text-loss';
       const changeSymbol = changePercent >= 0 ? '+' : '';
       changeCell.innerHTML = `<span class="${changeClass} font-medium">${changeSymbol}${changePercent.toFixed(2)}%</span>`;
+      cached.changePercent = changePercent;
     }
 
-    // Update volume
-    if (quote.volume !== undefined) {
+    // Update volume only if changed
+    if (quote.volume !== undefined && cached.volume !== quote.volume) {
       volumeCell.innerHTML = `<span>${Utils.formatNumber(quote.volume)}</span>`;
+      cached.volume = quote.volume;
     }
+
+    // Update cache
+    this.quoteCache.set(cacheKey, cached);
   }
 
   /**
@@ -1292,6 +1329,9 @@ class DashboardApp {
 
     try {
       await api.removeSymbol(watchlistId, symbolId);
+      // Clear quote cache for this symbol
+      const cacheKey = `${watchlistId}_${symbolId}`;
+      this.quoteCache.delete(cacheKey);
       Utils.showToast('Symbol removed', 'success');
       await this.renderWatchlistsView();
     } catch (error) {
