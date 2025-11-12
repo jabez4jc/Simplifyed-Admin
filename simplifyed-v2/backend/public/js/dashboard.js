@@ -441,19 +441,32 @@ class DashboardApp {
    * Toggle watchlist expansion
    */
   async toggleWatchlist(watchlistId) {
+    const contentDiv = document.getElementById(`watchlist-content-${watchlistId}`);
+    const symbolsDiv = document.getElementById(`watchlist-symbols-${watchlistId}`);
+    const headerDiv = document.querySelector(`[onclick="app.toggleWatchlist(${watchlistId})"] span`);
+
+    if (!contentDiv) return;
+
     if (this.expandedWatchlists.has(watchlistId)) {
+      // Collapse
       this.expandedWatchlists.delete(watchlistId);
+      contentDiv.classList.add('hidden');
+      if (headerDiv) headerDiv.textContent = '▶';
+
       // Stop polling for this watchlist
       this.stopWatchlistPolling(watchlistId);
     } else {
+      // Expand
       this.expandedWatchlists.add(watchlistId);
-    }
+      contentDiv.classList.remove('hidden');
+      if (headerDiv) headerDiv.textContent = '▼';
 
-    // Re-render watchlists first to ensure DOM is ready
-    await this.renderWatchlistsView();
+      // Render symbols if not already rendered
+      if (symbolsDiv && symbolsDiv.innerHTML.includes('Loading...')) {
+        symbolsDiv.innerHTML = await this.renderWatchlistSymbols(watchlistId);
+      }
 
-    // Start polling after DOM is rendered
-    if (this.expandedWatchlists.has(watchlistId)) {
+      // Start polling after DOM is ready
       this.startWatchlistPolling(watchlistId);
     }
   }
@@ -641,7 +654,7 @@ class DashboardApp {
 
   /**
    * Update quote display for a specific symbol
-   * Uses caching to prevent unnecessary DOM updates
+   * Uses caching to prevent unnecessary DOM updates and adds visual highlights on changes
    */
   updateSymbolQuote(watchlistId, symbolId, quote) {
     // Find the table cells for this symbol
@@ -673,23 +686,53 @@ class DashboardApp {
       return text === '-' || text === '';
     };
 
+    // Helper to add highlight animation
+    const addHighlight = (cell, animationClass) => {
+      cell.classList.remove('value-updated', 'value-profit-updated', 'value-loss-updated');
+      // Force reflow to restart animation
+      void cell.offsetWidth;
+      cell.classList.add(animationClass);
+    };
+
     // Update LTP if changed OR cell is empty/placeholder
     if (quote.ltp !== undefined && (cached.ltp !== quote.ltp || hasPlaceholder(ltpCell))) {
+      const valueChanged = cached.ltp !== quote.ltp && !hasPlaceholder(ltpCell);
       ltpCell.innerHTML = `<span class="font-medium">₹${Utils.formatNumber(quote.ltp)}</span>`;
+
+      // Add highlight animation if value actually changed
+      if (valueChanged) {
+        addHighlight(ltpCell, 'value-updated');
+      }
+
       cached.ltp = quote.ltp;
     }
 
     // Update % change if changed OR cell is empty/placeholder
     if (changePercent !== null && (cached.changePercent !== changePercent || hasPlaceholder(changeCell))) {
+      const valueChanged = cached.changePercent !== changePercent && !hasPlaceholder(changeCell);
       const changeClass = changePercent >= 0 ? 'text-profit' : 'text-loss';
       const changeSymbol = changePercent >= 0 ? '+' : '';
       changeCell.innerHTML = `<span class="${changeClass} font-medium">${changeSymbol}${changePercent.toFixed(2)}%</span>`;
+
+      // Add color-coded highlight animation if value actually changed
+      if (valueChanged) {
+        const animClass = changePercent >= 0 ? 'value-profit-updated' : 'value-loss-updated';
+        addHighlight(changeCell, animClass);
+      }
+
       cached.changePercent = changePercent;
     }
 
     // Update volume if changed OR cell is empty/placeholder
     if (quote.volume !== undefined && (cached.volume !== quote.volume || hasPlaceholder(volumeCell))) {
+      const valueChanged = cached.volume !== quote.volume && !hasPlaceholder(volumeCell);
       volumeCell.innerHTML = `<span>${Utils.formatNumber(quote.volume)}</span>`;
+
+      // Add highlight animation if value actually changed
+      if (valueChanged) {
+        addHighlight(volumeCell, 'value-updated');
+      }
+
       cached.volume = quote.volume;
     }
 
