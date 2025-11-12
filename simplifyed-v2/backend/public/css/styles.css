@@ -655,3 +655,46 @@ body {
   padding: var(--space-4);
   font-size: var(--font-size-base);
 }
+
+/* ========== Quote Value Animations ========== */
+/* Highlight animation for value changes */
+@keyframes value-highlight {
+  0% {
+    background-color: rgba(59, 130, 246, 0.3);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.value-updated {
+  animation: value-highlight 0.8s ease-out;
+}
+
+/* Profit value animation (green pulse) */
+@keyframes profit-highlight {
+  0% {
+    background-color: rgba(16, 185, 129, 0.3);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.value-profit-updated {
+  animation: profit-highlight 0.8s ease-out;
+}
+
+/* Loss value animation (red pulse) */
+@keyframes loss-highlight {
+  0% {
+    background-color: rgba(239, 68, 68, 0.3);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.value-loss-updated {
+  animation: loss-highlight 0.8s ease-out;
+}
