@@ -3,6 +3,7 @@
  * HTTP client with exponential backoff retry logic
  */
 
+import { ProxyAgent } from 'undici';
 import { log } from '../../core/logger.js';
 import { OpenAlgoError } from '../../core/errors.js';
 import config from '../../core/config.js';
@@ -16,6 +17,42 @@ class OpenAlgoClient {
     this.timeout = config.openalgo.requestTimeout;
     this.maxRetries = config.openalgo.maxRetries;
     this.retryDelay = config.openalgo.retryDelay;
+
+    // Create undici ProxyAgent that uses environment proxy
+    // TLS verification can be disabled via PROXY_TLS_REJECT_UNAUTHORIZED=false (development only)
+    const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY ||
+                     process.env.http_proxy || process.env.HTTP_PROXY;
+
+    // Parse TLS verification setting (defaults to true for security)
+    const rejectUnauthorized = process.env.PROXY_TLS_REJECT_UNAUTHORIZED !== 'false';
+
+    if (proxyUrl) {
+      try {
+        // Parse URL to safely extract host info without credentials
+        const proxyUrlObj = new URL(proxyUrl);
+        log.info('Using proxy for OpenAlgo requests', {
+          proxy: `${proxyUrlObj.protocol}//${proxyUrlObj.host}`,
+          tlsVerification: rejectUnauthorized
+        });
+
+        if (!rejectUnauthorized) {
+          log.warn('TLS certificate verification is DISABLED for proxy connections. Use only in development!');
+        }
+
+        this.dispatcher = new ProxyAgent({
+          uri: proxyUrl,
+          requestTls: {
+            rejectUnauthorized,
+          },
+        });
+      } catch (error) {
+        log.error('Invalid proxy URL, proceeding without proxy', { error: error.message });
+        this.dispatcher = null;
+      }
+    } else {
+      log.info('No proxy configured for OpenAlgo requests');
+      this.dispatcher = null;
+    }
   }
 
   /**
@@ -92,14 +129,21 @@ class OpenAlgoClient {
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
-      const response = await fetch(url, {
+      const fetchOptions = {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
         body: method === 'GET' ? undefined : JSON.stringify(payload),
         signal: controller.signal,
-      });
+      };
+
+      // Use proxy dispatcher if configured
+      if (this.dispatcher) {
+        fetchOptions.dispatcher = this.dispatcher;
+      }
+
+      const response = await fetch(url, fetchOptions);
 
       clearTimeout(timeoutId);
 
@@ -386,8 +430,8 @@ class OpenAlgoClient {
    * @returns {Promise<Array>} - Symbol list
    */
   async searchSymbols(instance, query) {
-    const response = await this.request(instance, 'searchscrip', {
-      search: query,
+    const response = await this.request(instance, 'search', {
+      query,
     });
     return response.data || [];
   }

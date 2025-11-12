@@ -26,19 +26,20 @@
   "author": "Simplifyed",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "helmet": "^7.1.0",
     "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
     "express-session": "^1.17.3",
+    "helmet": "^7.1.0",
+    "joi": "^17.11.0",
+    "node-cron": "^3.0.3",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "sqlite3": "^5.1.7",
-    "dotenv": "^16.3.1",
     "socket.io": "^4.6.1",
-    "winston": "^3.11.0",
-    "joi": "^17.11.0",
-    "node-cron": "^3.0.3"
+    "sqlite3": "^5.1.7",
+    "undici": "^7.16.0",
+    "winston": "^3.11.0"
   },
   "devDependencies": {
     "eslint": "^8.56.0",
