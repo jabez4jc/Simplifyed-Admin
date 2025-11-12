@@ -3,6 +3,7 @@
  * HTTP client with exponential backoff retry logic
  */
 
+import { ProxyAgent } from 'undici';
 import { log } from '../../core/logger.js';
 import { OpenAlgoError } from '../../core/errors.js';
 import config from '../../core/config.js';
@@ -16,6 +17,24 @@ class OpenAlgoClient {
     this.timeout = config.openalgo.requestTimeout;
     this.maxRetries = config.openalgo.maxRetries;
     this.retryDelay = config.openalgo.retryDelay;
+
+    // Create undici ProxyAgent that uses environment proxy and bypasses certificate verification
+    // This is needed for environments with proxy and self-signed certificates
+    const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY ||
+                     process.env.http_proxy || process.env.HTTP_PROXY;
+
+    if (proxyUrl) {
+      log.info('Using proxy for OpenAlgo requests', { proxy: proxyUrl.split('@')[0] }); // Don't log credentials
+      this.dispatcher = new ProxyAgent({
+        uri: proxyUrl,
+        requestTls: {
+          rejectUnauthorized: false,
+        },
+      });
+    } else {
+      log.info('No proxy configured for OpenAlgo requests');
+      this.dispatcher = null;
+    }
   }
 
   /**
@@ -92,14 +111,21 @@ class OpenAlgoClient {
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
-      const response = await fetch(url, {
+      const fetchOptions = {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
         body: method === 'GET' ? undefined : JSON.stringify(payload),
         signal: controller.signal,
-      });
+      };
+
+      // Use proxy dispatcher if configured
+      if (this.dispatcher) {
+        fetchOptions.dispatcher = this.dispatcher;
+      }
+
+      const response = await fetch(url, fetchOptions);
 
       clearTimeout(timeoutId);
 
@@ -386,8 +412,8 @@ class OpenAlgoClient {
    * @returns {Promise<Array>} - Symbol list
    */
   async searchSymbols(instance, query) {
-    const response = await this.request(instance, 'searchscrip', {
-      search: query,
+    const response = await this.request(instance, 'search', {
+      query: query,
     });
     return response.data || [];
   }
