@@ -694,10 +694,23 @@ class DashboardApp {
       cell.classList.add(animationClass);
     };
 
+    // Helper to get or create span element
+    const getOrCreateSpan = (cell, className = '') => {
+      let span = cell.querySelector('span');
+      if (!span) {
+        span = document.createElement('span');
+        if (className) span.className = className;
+        cell.innerHTML = '';
+        cell.appendChild(span);
+      }
+      return span;
+    };
+
     // Update LTP if changed OR cell is empty/placeholder
     if (quote.ltp !== undefined && (cached.ltp !== quote.ltp || hasPlaceholder(ltpCell))) {
       const valueChanged = cached.ltp !== quote.ltp && !hasPlaceholder(ltpCell);
-      ltpCell.innerHTML = `<span class="font-medium">₹${Utils.formatNumber(quote.ltp)}</span>`;
+      const span = getOrCreateSpan(ltpCell, 'font-medium');
+      span.textContent = `₹${Utils.formatNumber(quote.ltp)}`;
 
       // Add highlight animation if value actually changed
       if (valueChanged) {
@@ -712,7 +725,9 @@ class DashboardApp {
       const valueChanged = cached.changePercent !== changePercent && !hasPlaceholder(changeCell);
       const changeClass = changePercent >= 0 ? 'text-profit' : 'text-loss';
       const changeSymbol = changePercent >= 0 ? '+' : '';
-      changeCell.innerHTML = `<span class="${changeClass} font-medium">${changeSymbol}${changePercent.toFixed(2)}%</span>`;
+      const span = getOrCreateSpan(changeCell, `${changeClass} font-medium`);
+      span.className = `${changeClass} font-medium`; // Update class for color change
+      span.textContent = `${changeSymbol}${changePercent.toFixed(2)}%`;
 
       // Add color-coded highlight animation if value actually changed
       if (valueChanged) {
@@ -726,7 +741,8 @@ class DashboardApp {
     // Update volume if changed OR cell is empty/placeholder
     if (quote.volume !== undefined && (cached.volume !== quote.volume || hasPlaceholder(volumeCell))) {
       const valueChanged = cached.volume !== quote.volume && !hasPlaceholder(volumeCell);
-      volumeCell.innerHTML = `<span>${Utils.formatNumber(quote.volume)}</span>`;
+      const span = getOrCreateSpan(volumeCell);
+      span.textContent = Utils.formatNumber(quote.volume);
 
       // Add highlight animation if value actually changed
       if (valueChanged) {
