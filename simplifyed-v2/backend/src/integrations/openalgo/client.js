@@ -383,6 +383,21 @@ class OpenAlgoClient {
   }
 
   /**
+   * Get symbol details (point lookup for validation)
+   * @param {Object} instance - Instance configuration
+   * @param {string} symbol - Trading symbol
+   * @param {string} exchange - Exchange code (NSE, NFO, BSE, BFO, etc.)
+   * @returns {Promise<Object>} - Symbol metadata with instrumenttype, expiry, strike, lotsize, etc.
+   */
+  async getSymbol(instance, symbol, exchange) {
+    const response = await this.request(instance, 'symbol', {
+      symbol,
+      exchange,
+    });
+    return response.data || response;
+  }
+
+  /**
    * Place split order (splits large order into smaller chunks)
    * @param {Object} instance - Instance configuration
    * @param {Object} orderData - Order parameters with splitsize
