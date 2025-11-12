@@ -667,22 +667,28 @@ class DashboardApp {
       changePercent = ((quote.ltp - quote.prev_close) / quote.prev_close) * 100;
     }
 
-    // Update LTP only if changed
-    if (quote.ltp !== undefined && cached.ltp !== quote.ltp) {
+    // Helper to check if cell has placeholder or is empty
+    const hasPlaceholder = (cell) => {
+      const text = cell.textContent.trim();
+      return text === '-' || text === '';
+    };
+
+    // Update LTP if changed OR cell is empty/placeholder
+    if (quote.ltp !== undefined && (cached.ltp !== quote.ltp || hasPlaceholder(ltpCell))) {
       ltpCell.innerHTML = `<span class="font-medium">₹${Utils.formatNumber(quote.ltp)}</span>`;
       cached.ltp = quote.ltp;
     }
 
-    // Update % change only if changed
-    if (changePercent !== null && cached.changePercent !== changePercent) {
+    // Update % change if changed OR cell is empty/placeholder
+    if (changePercent !== null && (cached.changePercent !== changePercent || hasPlaceholder(changeCell))) {
       const changeClass = changePercent >= 0 ? 'text-profit' : 'text-loss';
       const changeSymbol = changePercent >= 0 ? '+' : '';
       changeCell.innerHTML = `<span class="${changeClass} font-medium">${changeSymbol}${changePercent.toFixed(2)}%</span>`;
       cached.changePercent = changePercent;
     }
 
-    // Update volume only if changed
-    if (quote.volume !== undefined && cached.volume !== quote.volume) {
+    // Update volume if changed OR cell is empty/placeholder
+    if (quote.volume !== undefined && (cached.volume !== quote.volume || hasPlaceholder(volumeCell))) {
       volumeCell.innerHTML = `<span>${Utils.formatNumber(quote.volume)}</span>`;
       cached.volume = quote.volume;
     }
