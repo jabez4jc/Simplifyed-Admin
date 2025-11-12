@@ -279,6 +279,13 @@ class APIClient {
     return this.request(`/symbols/search?${params}`);
   }
 
+  async validateSymbol(symbol, exchange, instanceId = null) {
+    return this.request('/symbols/validate', {
+      method: 'POST',
+      body: { symbol, exchange, instanceId },
+    });
+  }
+
   async getQuotes(symbols, instanceId) {
     const params = new URLSearchParams({ symbols, instanceId });
     return this.request(`/symbols/quotes?${params}`);

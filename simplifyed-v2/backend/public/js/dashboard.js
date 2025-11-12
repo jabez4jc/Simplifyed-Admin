@@ -319,7 +319,7 @@ class DashboardApp {
   }
 
   /**
-   * Render Watchlists View
+   * Render Watchlists View (Accordion Style)
    */
   async renderWatchlistsView() {
     const contentArea = document.getElementById('content-area');
@@ -327,6 +327,7 @@ class DashboardApp {
     // Fetch watchlists
     const response = await api.getWatchlists();
     this.watchlists = response.data;
+    this.expandedWatchlists = this.expandedWatchlists || new Set();
 
     contentArea.innerHTML = `
       <div class="card">
@@ -336,64 +337,170 @@ class DashboardApp {
             + Add Watchlist
           </button>
         </div>
-        <div class="table-container">
-          ${this.renderWatchlistsTable(this.watchlists)}
+        <div id="watchlists-container" class="p-4 space-y-4">
+          ${await this.renderWatchlistsAccordion(this.watchlists)}
         </div>
       </div>
     `;
   }
 
   /**
-   * Render watchlists table
+   * Render watchlists as accordion cards
    */
-  renderWatchlistsTable(watchlists) {
+  async renderWatchlistsAccordion(watchlists) {
     if (watchlists.length === 0) {
-      return '<p class="text-center text-neutral-600">No watchlists found</p>';
+      return `
+        <div class="text-center text-neutral-600 py-8">
+          <p>No watchlists found</p>
+        </div>
+      `;
     }
 
+    const cardsHTML = [];
+    for (const wl of watchlists) {
+      const isExpanded = this.expandedWatchlists.has(wl.id);
+      cardsHTML.push(await this.renderWatchlistCard(wl, isExpanded));
+    }
+
+    return cardsHTML.join('');
+  }
+
+  /**
+   * Render individual watchlist card with accordion
+   */
+  async renderWatchlistCard(wl, isExpanded) {
+    const statusColor = wl.is_active ? 'success' : 'neutral';
+
     return `
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Description</th>
-            <th>Symbols</th>
-            <th>Instances</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${watchlists.map(wl => `
-            <tr>
-              <td class="font-medium">${Utils.escapeHTML(wl.name)}</td>
-              <td>${Utils.escapeHTML(wl.description || '-')}</td>
-              <td>${wl.symbol_count || 0}</td>
-              <td>${wl.instance_count || 0}</td>
-              <td>${Utils.getStatusBadge(wl.is_active ? 'active' : 'inactive')}</td>
-              <td>${Utils.formatRelativeTime(wl.created_at)}</td>
-              <td>
-                <div class="flex gap-2">
-                  <button class="btn btn-secondary btn-sm"
-                          onclick="app.viewWatchlistDetails(${wl.id})">
-                    View
-                  </button>
-                  <button class="btn btn-secondary btn-sm"
-                          onclick="app.showEditWatchlistModal(${wl.id})">
-                    Edit
-                  </button>
-                  <button class="btn btn-error btn-sm"
-                          onclick="app.deleteWatchlist(${wl.id})">
-                    Delete
-                  </button>
-                </div>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      <div class="card" style="border-left: 4px solid var(--color-${statusColor}-500);">
+        <!-- Header (Always Visible) -->
+        <div class="card-header cursor-pointer" onclick="app.toggleWatchlist(${wl.id})">
+          <div class="flex items-center justify-between w-full">
+            <div class="flex items-center gap-4">
+              <span class="text-2xl">
+                ${isExpanded ? '▼' : '▶'}
+              </span>
+              <div>
+                <h4 class="text-lg font-semibold">${Utils.escapeHTML(wl.name)}</h4>
+                <p class="text-sm text-neutral-600">${Utils.escapeHTML(wl.description || 'No description')}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="text-right text-sm">
+                <span class="text-neutral-700">${wl.symbol_count || 0} symbols</span>
+                <span class="mx-2">•</span>
+                <span class="text-neutral-700">${wl.instance_count || 0} instances</span>
+              </div>
+              <span class="badge badge-${statusColor}">
+                ${wl.is_active ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expanded Content -->
+        <div id="watchlist-content-${wl.id}" class="${isExpanded ? '' : 'hidden'}">
+          <div class="p-4 border-t">
+            <!-- Action Buttons -->
+            <div class="flex gap-2 mb-4">
+              <button class="btn btn-primary btn-sm" onclick="app.showAddSymbolModal(${wl.id})">
+                + Add Symbol
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="app.showEditWatchlistModal(${wl.id})">
+                ✏️ Edit
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="app.manageWatchlistInstances(${wl.id})">
+                🔗 Manage Instances
+              </button>
+              <button class="btn btn-error btn-sm" onclick="app.deleteWatchlist(${wl.id})">
+                🗑️ Delete
+              </button>
+            </div>
+
+            <!-- Symbols List -->
+            <div id="watchlist-symbols-${wl.id}">
+              ${isExpanded ? await this.renderWatchlistSymbols(wl.id) : '<p class="text-neutral-600">Loading...</p>'}
+            </div>
+          </div>
+        </div>
+      </div>
     `;
+  }
+
+  /**
+   * Toggle watchlist expansion
+   */
+  async toggleWatchlist(watchlistId) {
+    if (this.expandedWatchlists.has(watchlistId)) {
+      this.expandedWatchlists.delete(watchlistId);
+    } else {
+      this.expandedWatchlists.add(watchlistId);
+    }
+
+    // Re-render watchlists
+    await this.renderWatchlistsView();
+  }
+
+  /**
+   * Render symbols for a watchlist
+   */
+  async renderWatchlistSymbols(watchlistId) {
+    try {
+      const response = await api.getWatchlistSymbols(watchlistId);
+      const symbols = response.data;
+
+      if (symbols.length === 0) {
+        return '<p class="text-neutral-600 text-sm">No symbols added yet</p>';
+      }
+
+      return `
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Exchange</th>
+              <th>Type</th>
+              <th>Lot Size</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${symbols.map(sym => `
+              <tr>
+                <td class="font-medium">${Utils.escapeHTML(sym.symbol)}</td>
+                <td>${Utils.escapeHTML(sym.exchange)}</td>
+                <td>
+                  <span class="badge ${this.getSymbolTypeBadgeClass(sym.symbol_type || 'UNKNOWN')}">
+                    ${sym.symbol_type || 'UNKNOWN'}
+                  </span>
+                </td>
+                <td>${sym.lotsize || 1}</td>
+                <td>
+                  <button class="btn btn-error btn-sm" onclick="app.removeSymbol(${watchlistId}, ${sym.id})">
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (error) {
+      return `<p class="text-error">Failed to load symbols: ${error.message}</p>`;
+    }
+  }
+
+  /**
+   * Get badge class for symbol type
+   */
+  getSymbolTypeBadgeClass(type) {
+    const classes = {
+      EQUITY: 'badge-info',
+      FUTURES: 'badge-warning',
+      OPTIONS: 'badge-success',
+      UNKNOWN: 'badge-neutral',
+    };
+    return classes[type] || 'badge-neutral';
   }
 
   /**
@@ -887,6 +994,243 @@ class DashboardApp {
       await api.deleteInstance(instanceId);
       Utils.showToast('Instance deleted', 'success');
       await this.refreshCurrentView();
+    } catch (error) {
+      Utils.showToast(error.message, 'error');
+    }
+  }
+
+  /**
+   * Show add symbol modal with search
+   */
+  async showAddSymbolModal(watchlistId) {
+    this.currentWatchlistId = watchlistId;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+          <h3>Add Symbol to Watchlist</h3>
+        </div>
+        <div class="modal-body">
+          <!-- Symbol Search -->
+          <div class="form-group">
+            <label class="form-label">Search Symbol</label>
+            <input type="text" id="symbol-search-input" class="form-input"
+                   placeholder="Type symbol name (e.g., RELIANCE, NIFTY, BANKNIFTY)"
+                   oninput="app.debounceSymbolSearch(this.value)">
+          </div>
+
+          <!-- Search Results -->
+          <div id="symbol-search-results" class="mt-4"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+            Cancel
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('symbol-search-input').focus();
+  }
+
+  /**
+   * Debounce symbol search
+   */
+  debounceSymbolSearch(query) {
+    clearTimeout(this.searchTimeout);
+    this.searchTimeout = setTimeout(() => this.searchSymbols(query), 300);
+  }
+
+  /**
+   * Search symbols with classification
+   */
+  async searchSymbols(query) {
+    if (!query || query.length < 2) {
+      document.getElementById('symbol-search-results').innerHTML = '';
+      return;
+    }
+
+    const resultsContainer = document.getElementById('symbol-search-results');
+    resultsContainer.innerHTML = '<p class="text-neutral-600">Searching...</p>';
+
+    try {
+      const response = await api.searchSymbols(query);
+      const results = response.data;
+
+      if (results.length === 0) {
+        resultsContainer.innerHTML = '<p class="text-neutral-600">No results found</p>';
+        return;
+      }
+
+      resultsContainer.innerHTML = `
+        <div class="space-y-2">
+          <p class="text-sm text-neutral-700 font-semibold">${results.length} results found:</p>
+          <div class="max-h-96 overflow-y-auto space-y-2">
+            ${results.map(sym => `
+              <div class="p-3 border rounded cursor-pointer hover:bg-neutral-100"
+                   onclick="app.selectSymbol(${JSON.stringify(sym).replace(/"/g, '&quot;')})">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <span class="font-semibold">${Utils.escapeHTML(sym.tradingsymbol || sym.symbol)}</span>
+                    <span class="text-sm text-neutral-600 ml-2">${Utils.escapeHTML(sym.exchange)}</span>
+                  </div>
+                  <span class="badge ${this.getSymbolTypeBadgeClass(sym.symbol_type)}">
+                    ${sym.symbol_type}
+                  </span>
+                </div>
+                ${sym.name ? `<p class="text-sm text-neutral-600 mt-1">${Utils.escapeHTML(sym.name)}</p>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    } catch (error) {
+      resultsContainer.innerHTML = `<p class="text-error">Search failed: ${error.message}</p>`;
+    }
+  }
+
+  /**
+   * Select symbol from search results
+   */
+  async selectSymbol(symbolData) {
+    try {
+      Utils.showToast('Adding symbol...', 'info');
+
+      // Add symbol to watchlist
+      await api.addSymbol(this.currentWatchlistId, {
+        symbol: symbolData.tradingsymbol || symbolData.symbol,
+        exchange: symbolData.exchange,
+        token: symbolData.token,
+        lotsize: symbolData.lotsize || 1,
+        symbol_type: symbolData.symbol_type,
+      });
+
+      Utils.showToast('Symbol added successfully', 'success');
+
+      // Close modal
+      document.querySelector('.modal-overlay').remove();
+
+      // Refresh watchlist view
+      await this.renderWatchlistsView();
+    } catch (error) {
+      Utils.showToast(error.message, 'error');
+    }
+  }
+
+  /**
+   * Remove symbol from watchlist
+   */
+  async removeSymbol(watchlistId, symbolId) {
+    const confirmed = await Utils.confirm(
+      'Remove this symbol from the watchlist?',
+      'Confirm Remove'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.removeSymbol(watchlistId, symbolId);
+      Utils.showToast('Symbol removed', 'success');
+      await this.renderWatchlistsView();
+    } catch (error) {
+      Utils.showToast(error.message, 'error');
+    }
+  }
+
+  /**
+   * Manage watchlist instances
+   */
+  async manageWatchlistInstances(watchlistId) {
+    // Fetch watchlist and all instances
+    const [watchlistResponse, instancesResponse] = await Promise.all([
+      api.getWatchlistById(watchlistId),
+      api.getInstances(),
+    ]);
+
+    const watchlist = watchlistResponse.data;
+    const allInstances = instancesResponse.data;
+    const assignedIds = new Set((watchlist.instances || []).map(i => i.id));
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Manage Instances - ${Utils.escapeHTML(watchlist.name)}</h3>
+        </div>
+        <div class="modal-body">
+          <p class="text-sm text-neutral-700 mb-4">
+            Select instances to assign to this watchlist:
+          </p>
+          <div class="space-y-2" id="instance-checkboxes">
+            ${allInstances.map(inst => `
+              <label class="flex items-center gap-3 p-2 border rounded hover:bg-neutral-50 cursor-pointer">
+                <input type="checkbox"
+                       class="instance-checkbox"
+                       data-instance-id="${inst.id}"
+                       ${assignedIds.has(inst.id) ? 'checked' : ''}>
+                <div class="flex-1">
+                  <span class="font-semibold">${Utils.escapeHTML(inst.name)}</span>
+                  <span class="text-sm text-neutral-600 ml-2">(${Utils.escapeHTML(inst.broker || 'N/A')})</span>
+                </div>
+                <span class="badge badge-${inst.health_status === 'healthy' ? 'success' : 'warning'}">
+                  ${inst.health_status || 'unknown'}
+                </span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+            Cancel
+          </button>
+          <button class="btn btn-primary" onclick="app.submitInstanceAssignments(${watchlistId})">
+            Save Assignments
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+  }
+
+  /**
+   * Submit instance assignments
+   */
+  async submitInstanceAssignments(watchlistId) {
+    try {
+      const checkboxes = document.querySelectorAll('.instance-checkbox');
+      const selectedIds = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => parseInt(cb.dataset.instanceId));
+
+      // Fetch current assignments
+      const watchlistResponse = await api.getWatchlistById(watchlistId);
+      const currentIds = new Set((watchlistResponse.data.instances || []).map(i => i.id));
+
+      // Determine adds and removes
+      const toAdd = selectedIds.filter(id => !currentIds.has(id));
+      const toRemove = Array.from(currentIds).filter(id => !selectedIds.includes(id));
+
+      // Execute assignments
+      for (const instanceId of toAdd) {
+        await api.assignInstance(watchlistId, instanceId);
+      }
+
+      for (const instanceId of toRemove) {
+        await api.unassignInstance(watchlistId, instanceId);
+      }
+
+      Utils.showToast('Instance assignments updated', 'success');
+
+      // Close modal
+      document.querySelector('.modal-overlay').remove();
+
+      // Refresh view
+      await this.renderWatchlistsView();
     } catch (error) {
       Utils.showToast(error.message, 'error');
     }

@@ -5,6 +5,7 @@
 
 import express from 'express';
 import instanceService from '../../services/instance.service.js';
+import symbolValidationService from '../../services/symbol-validation.service.js';
 import openalgoClient from '../../integrations/openalgo/client.js';
 import db from '../../core/database.js';
 import { log } from '../../core/logger.js';
@@ -15,7 +16,7 @@ const router = express.Router();
 
 /**
  * GET /api/v1/symbols/search
- * Search for symbols using OpenAlgo
+ * Search for symbols using OpenAlgo with classification
  */
 router.get('/search', async (req, res, next) => {
   try {
@@ -25,84 +26,47 @@ router.get('/search', async (req, res, next) => {
       throw new ValidationError('query parameter is required');
     }
 
-    // Get an instance to use for search
-    // Prefer market data instances (primary/secondary) for consistency
-    let instance;
-
-    if (instanceId) {
-      instance = await instanceService.getInstanceById(parseInt(instanceId, 10));
-    } else {
-      // Use market data instance (primary or secondary)
-      const marketDataInstances = await instanceService.getMarketDataInstances();
-
-      if (marketDataInstances.length === 0) {
-        // Fallback to any active instance if no market data instances configured
-        // Prefer healthy instances over unhealthy ones
-        const instances = await instanceService.getAllInstances({
-          is_active: true,
-        });
-
-        if (instances.length === 0) {
-          throw new ValidationError('No active instances available for search');
-        }
-
-        // Filter for healthy instances first
-        const healthyInstances = instances.filter(
-          (inst) => inst.health_status === 'healthy'
-        );
-
-        if (healthyInstances.length > 0) {
-          instance = healthyInstances[0];
-          log.debug('Using fallback healthy instance for symbol search', {
-            instance_id: instance.id,
-            health_status: instance.health_status,
-          });
-        } else {
-          // Use any active instance if no healthy instances available
-          instance = instances[0];
-          log.warn('Using fallback instance with non-healthy status for symbol search', {
-            instance_id: instance.id,
-            health_status: instance.health_status,
-          });
-        }
-      } else {
-        instance = marketDataInstances[0];
-        log.debug('Using market data instance for symbol search', {
-          instance_id: instance.id,
-          market_data_role: instance.market_data_role,
-        });
-      }
-    }
-
-    // Search symbols via OpenAlgo
-    const results = await openalgoClient.searchSymbols(instance, query);
-
-    // Cache results in database
-    for (const symbol of results) {
-      try {
-        await db.run(
-          `INSERT INTO symbol_search_cache (exchange, symbol, token, name)
-           VALUES (?, ?, ?, ?)
-           ON CONFLICT(exchange, symbol) DO UPDATE SET
-             token = excluded.token,
-             name = excluded.name,
-             last_searched = CURRENT_TIMESTAMP`,
-          [
-            symbol.exchange,
-            symbol.symbol || symbol.tradingsymbol,
-            symbol.token,
-            symbol.name || symbol.company_name || null,
-          ]
-        );
-      } catch (error) {
-        log.warn('Failed to cache symbol', error, { symbol });
-      }
-    }
+    // Use symbol validation service for search with classification
+    const results = await symbolValidationService.searchSymbols(
+      query,
+      instanceId ? parseInt(instanceId, 10) : null
+    );
 
     res.json({
       status: 'success',
       data: results,
       count: results.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/v1/symbols/validate
+ * Validate and get detailed symbol information
+ */
+router.post('/validate', async (req, res, next) => {
+  try {
+    const { symbol, exchange, instanceId } = req.body;
+
+    if (!symbol || !exchange) {
+      throw new ValidationError('symbol and exchange are required');
+    }
+
+    // Validate symbol using OpenAlgo /symbol endpoint
+    const validated = await symbolValidationService.validateSymbol(
+      symbol,
+      exchange,
+      instanceId ? parseInt(instanceId, 10) : null
+    );
+
+    res.json({
+      status: 'success',
+      data: validated,
+      message: validated.from_cache
+        ? 'Symbol retrieved from cache'
+        : 'Symbol validated via OpenAlgo',
     });
   } catch (error) {
     next(error);
