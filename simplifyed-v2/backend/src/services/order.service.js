@@ -515,6 +515,13 @@ class OrderService {
     if (!exchange) {
       errors.push({ field: 'exchange', message: 'Valid exchange is required' });
     } else {
+      // Reject INDEX symbols (NSE_INDEX, BSE_INDEX) - they cannot be traded directly
+      if (exchange === 'NSE_INDEX' || exchange === 'BSE_INDEX') {
+        errors.push({
+          field: 'exchange',
+          message: 'Index symbols cannot be traded directly. Please trade index derivatives (Futures/Options) instead.',
+        });
+      }
       normalized.exchange = exchange;
     }
 
