@@ -103,13 +103,23 @@ class OpenAlgoClient {
 
       clearTimeout(timeoutId);
 
+      // Clone response so we can read it twice if JSON parsing fails
+      const responseClone = response.clone();
+
       // Parse response
       let responseData;
       try {
         responseData = await response.json();
       } catch (error) {
+        // Use the cloned response to get text for error message
+        let responseText;
+        try {
+          responseText = await responseClone.text();
+        } catch (textError) {
+          responseText = 'Unable to read response body';
+        }
         throw new OpenAlgoError(
-          `Invalid JSON response: ${await response.text()}`,
+          `Invalid JSON response: ${responseText.substring(0, 200)}`,
           url,
           response.status
         );
