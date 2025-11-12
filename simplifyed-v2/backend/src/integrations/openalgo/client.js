@@ -18,17 +18,30 @@ class OpenAlgoClient {
     this.maxRetries = config.openalgo.maxRetries;
     this.retryDelay = config.openalgo.retryDelay;
 
-    // Create undici ProxyAgent that uses environment proxy and bypasses certificate verification
-    // This is needed for environments with proxy and self-signed certificates
+    // Create undici ProxyAgent that uses environment proxy
+    // TLS verification can be disabled via PROXY_TLS_REJECT_UNAUTHORIZED=false (development only)
     const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY ||
                      process.env.http_proxy || process.env.HTTP_PROXY;
 
+    // Parse TLS verification setting (defaults to true for security)
+    const rejectUnauthorized = process.env.PROXY_TLS_REJECT_UNAUTHORIZED !== 'false';
+
     if (proxyUrl) {
-      log.info('Using proxy for OpenAlgo requests', { proxy: proxyUrl.split('@')[0] }); // Don't log credentials
+      // Parse URL to safely extract host info without credentials
+      const proxyUrlObj = new URL(proxyUrl);
+      log.info('Using proxy for OpenAlgo requests', {
+        proxy: `${proxyUrlObj.protocol}//${proxyUrlObj.host}`,
+        tlsVerification: rejectUnauthorized
+      });
+
+      if (!rejectUnauthorized) {
+        log.warn('TLS certificate verification is DISABLED for proxy connections. Use only in development!');
+      }
+
       this.dispatcher = new ProxyAgent({
         uri: proxyUrl,
         requestTls: {
-          rejectUnauthorized: false,
+          rejectUnauthorized,
         },
       });
     } else {
@@ -413,7 +426,7 @@ class OpenAlgoClient {
    */
   async searchSymbols(instance, query) {
     const response = await this.request(instance, 'search', {
-      query: query,
+      query,
     });
     return response.data || [];
   }
